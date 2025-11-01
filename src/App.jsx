@@ -1,6 +1,25 @@
-import { useState, useEffect, useMemo } from "react";
-import { Target, Calendar as CalendarIcon, BookOpen, LineChart, Settings as SettingsIcon, CheckCircle, XCircle, Clock, PlusCircle } from "lucide-react";
-import { Trophy, DollarSign, Home, Play, Users, Heart } from "lucide-react";
+import {
+  Target,
+  Calendar as CalendarIcon,
+  BookOpen,
+  LineChart,
+  Settings as SettingsIcon,
+  CheckCircle,
+  XCircle,
+  Clock,
+  PlusCircle,
+  Trash2,
+  UserCog,
+  CalendarDays,
+  Trophy,
+  DollarSign,
+  Home,
+  Play,
+  Users,
+  Heart,
+} from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+
 import VideoLibraryView from "./components/VideoLibraryView";
 import DashboardView from "./components/DashboardView";
 
@@ -13,7 +32,6 @@ const BELTS = [
   "Noire", "Noire 1 Dan", "Noire 2 Dan", "Noire 3 Dan",
 ];
 const beltIndex = (b) => BELTS.indexOf(b);
-const fmt = (d) => (d ? new Date(d).toLocaleDateString() : "—");
 
 // Règles de passage (modifiable)
 const DEFAULT_RULES = {
@@ -158,9 +176,6 @@ function lastPassageDate(events) {
 
 
 
-// ==============================================================
-// Calendrier — ajout d’événements + pré-remplissage récurrent (jours fériés exclus)
-// ==============================================================
 function CalendarView({ events, setEvents, planning, profil, holidays }) {
   const [month, setMonth] = useState(new Date());
   const [selected, setSelected] = useState(null);
@@ -169,19 +184,49 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
 
   const start = useMemo(() => new Date(month.getFullYear(), month.getMonth(), 1), [month]);
   const end = useMemo(() => new Date(month.getFullYear(), month.getMonth() + 1, 0), [month]);
-  const days = useMemo(() => Array.from({ length: end.getDate() }, (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1)), [end, month]);
+  const days = useMemo(
+    () => Array.from({ length: end.getDate() }, (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1)),
+    [end, month]
+  );
 
+  // ======================================================
+  // 🔧 Fonction d'affichage des icônes selon type & statut
+  // ======================================================
+  const getEventIcon = (e) => {
+    const today = new Date().toISOString().split("T")[0];
+    const isPast = e.date < today;
+
+    let icon = "❓";
+    if (e.type === "groupe") icon = "🥋";
+    else if (e.type === "competition") icon = "🏆";
+    else if (e.type === "maison") icon = "💪";
+    else if (e.type === "passage") icon = "🎯";
+    else if (e.type === "privé") icon = "🤝";
+    else if (e.type === "seminaire") icon = "📚";
+
+    // Couleur selon statut
+    let color = "text-gray-400"; // par défaut (en attente)
+    if (e.status === "fait") color = "text-green-600";
+    else if (e.status === "non fait") color = "text-orange-500";
+    else if (e.status === "planifié" && isPast) color = "text-red-400"; // oublié
+    else if (e.status === "planifié" && !isPast) color = "text-gray-500";
+
+    return <span className={`${color} text-lg`} title={`${e.title} (${e.type})`}>{icon}</span>;
+  };
+
+  // ======================================================
+  // 📅 Fonctions existantes
+  // ======================================================
   const preRemplirMois = () => {
     const nouvelles = [];
     days.forEach((d) => {
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = d.toISOString().split("T")[0];
       if (holidays.includes(dateStr)) return;
       const jourNom = d.toLocaleDateString('fr-CA', { weekday: 'long' }).toLowerCase();
       const jourPlanning = planning.find((p) => p.jour.toLowerCase() === jourNom);
       if (jourPlanning) {
         jourPlanning.cours.forEach((c) => {
-          if (c.type !== profil) return; // respecte le profil
-          // éviter doublons exacts
+          if (c.type !== profil) return;
           const exists = events.some(ev => ev.date === dateStr && ev.title === c.nom && ev.time === c.heure && ev.type === 'groupe');
           if (!exists) nouvelles.push({ date: dateStr, title: c.nom, time: c.heure, status: 'planifié', type: 'groupe' });
         });
@@ -197,7 +242,8 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
     setShowAdd(false);
   };
 
-  const setStatus = (index, status) => setEvents(prev => prev.map((e, i) => i === index ? { ...e, status } : e));
+  const setStatus = (index, status) =>
+    setEvents(prev => prev.map((e, i) => (i === index ? { ...e, status } : e)));
 
   const changeMonth = (delta) => {
     const nm = new Date(month);
@@ -210,27 +256,41 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
     return events.map((e, i) => ({ ...e, __i: i })).filter(e => e.date === ds);
   };
 
+  // ======================================================
+  // 🖥️ Rendu visuel du calendrier
+  // ======================================================
   return (
     <div>
       <div className="flex justify-between items-center mb-4 gap-2">
         <button onClick={() => changeMonth(-1)} className="px-2 py-1 border rounded">◀️</button>
-        <h2 className="text-2xl font-bold flex-1 text-center">{month.toLocaleString('fr-CA', { month: 'long', year: 'numeric' })}</h2>
+        <h2 className="text-2xl font-bold flex-1 text-center">
+          {month.toLocaleString('fr-CA', { month: 'long', year: 'numeric' })}
+        </h2>
         <button onClick={() => changeMonth(1)} className="px-2 py-1 border rounded">▶️</button>
         <button onClick={preRemplirMois} className="bg-red-600 text-white px-3 py-1 rounded">Pré-remplir</button>
-        <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 bg-green-600 text-white px-3 py-1 rounded"><PlusCircle className="w-4 h-4" /> Ajouter</button>
+        <button
+          onClick={() => setShowAdd(true)}
+          className="flex items-center gap-1 bg-green-600 text-white px-3 py-1 rounded"
+        >
+          ➕ Ajouter
+        </button>
       </div>
 
       <div className="grid grid-cols-7 gap-2">
         {days.map((d, i) => (
           <div key={i} className="h-24 border rounded p-1 text-xs flex flex-col">
             <div className="font-bold text-center">{d.getDate()}</div>
-            <div className="text-[10px] text-gray-700 text-center mb-1">{d.toLocaleDateString('fr-CA', { weekday: 'short' })}</div>
+            <div className="text-[10px] text-gray-700 text-center mb-1">
+              {d.toLocaleDateString('fr-CA', { weekday: 'short' })}
+            </div>
             <div className="flex flex-wrap justify-center gap-1">
               {eventsForDate(d).map((e) => (
-                <button key={e.__i} onClick={() => setSelected(e)} title={`${e.title} · ${e.time||''}`}>
-                  {e.status === 'fait' && <CheckCircle className="text-green-500 w-4 h-4" />}
-                  {e.status === 'planifié' && <Clock className="text-yellow-500 w-4 h-4" />}
-                  {e.status === 'non fait' && <XCircle className="text-orange-500 w-4 h-4" />}
+                <button
+                  key={e.__i}
+                  onClick={() => setSelected(e)}
+                  className="hover:scale-110 transition-transform"
+                >
+                  {getEventIcon(e)}
                 </button>
               ))}
             </div>
@@ -238,39 +298,77 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
         ))}
       </div>
 
+      {/* Fenêtre de détails */}
       {selected && (
-        <div className="fixed inset-0 bg-black/30 flex justify-center items-center">
-          <div className="bg-white rounded p-6 w-96">
+        <div className="fixed inset-0 bg-black/30 flex justify-center items-center z-50">
+          <div className="bg-white rounded p-6 w-96 shadow-lg">
             <h3 className="text-lg font-bold mb-2">{selected.title}</h3>
-            <p>Date : {fmt(selected.date)}</p>
+            <p>Date : {selected.date}</p>
             <p>Heure : {selected.time || '—'}</p>
+            <p>Type : {selected.type}</p>
             <div className="flex gap-2 mt-3">
-              <button onClick={() => { setStatus(selected.__i, 'fait'); setSelected(null); }} className="bg-green-500 text-white px-3 py-1 rounded">Fait</button>
-              <button onClick={() => { setStatus(selected.__i, 'non fait'); setSelected(null); }} className="bg-orange-500 text-white px-3 py-1 rounded">Non fait</button>
-              <button onClick={() => setSelected(null)} className="ml-auto text-gray-600">Fermer</button>
+              <button
+                onClick={() => { setStatus(selected.__i, 'fait'); setSelected(null); }}
+                className="bg-green-500 text-white px-3 py-1 rounded"
+              >
+                ✅ Fait
+              </button>
+              <button
+                onClick={() => { setStatus(selected.__i, 'non fait'); setSelected(null); }}
+                className="bg-orange-500 text-white px-3 py-1 rounded"
+              >
+                ❌ Non fait
+              </button>
+              <button onClick={() => setSelected(null)} className="ml-auto text-gray-600">
+                Fermer
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Fenêtre d’ajout */}
       {showAdd && (
-        <div className="fixed inset-0 bg-black/30 flex justify-center items-center">
-          <div className="bg-white rounded p-6 w-96">
+        <div className="fixed inset-0 bg-black/30 flex justify-center items-center z-50">
+          <div className="bg-white rounded p-6 w-96 shadow-lg">
             <h3 className="text-lg font-bold mb-2">Ajouter un événement</h3>
-            <input type="text" placeholder="Nom de l'événement" className="border p-1 w-full mb-2" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} />
-            <input type="date" className="border p-1 w-full mb-2" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} />
-            <input type="text" placeholder="Heure (ex: 18h-19h)" className="border p-1 w-full mb-2" value={newEvent.time} onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })} />
-            <select className="border p-1 w-full mb-3" value={newEvent.type} onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}>
+            <input
+              type="text"
+              placeholder="Nom de l'événement"
+              className="border p-1 w-full mb-2"
+              value={newEvent.title}
+              onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+            />
+            <input
+              type="date"
+              className="border p-1 w-full mb-2"
+              value={newEvent.date}
+              onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Heure (ex: 18h-19h)"
+              className="border p-1 w-full mb-2"
+              value={newEvent.time}
+              onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+            />
+            <select
+              className="border p-1 w-full mb-3"
+              value={newEvent.type}
+              onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}
+            >
+              <option value="groupe">Cours de groupe</option>
               <option value="privé">Cours privé</option>
               <option value="maison">Entraînement maison</option>
               <option value="competition">Compétition</option>
               <option value="passage">Passage de ceinture</option>
               <option value="seminaire">Séminaire</option>
-              <option value="groupe">Cours de groupe (manuel)</option>
             </select>
             <div className="flex gap-2">
               <button onClick={addEvent} className="bg-green-600 text-white px-3 py-1 rounded">Ajouter</button>
-              <button onClick={() => setShowAdd(false)} className="ml-auto text-gray-600">Annuler</button>
+              <button onClick={() => setShowAdd(false)} className="ml-auto text-gray-600">
+                Annuler
+              </button>
             </div>
           </div>
         </div>
@@ -333,6 +431,20 @@ function BaseTechniqueView({ profil }) {
 // ==============================================================
 // Progression — points depuis dernière ceinture (via événements 'passage')
 // ==============================================================
+
+// ✅ Nouvelle fonction pour formater les dates sans décalage UTC
+function fmt(dateString) {
+  if (!dateString) return "";
+  const [year, month, day] = dateString.split("-");
+  // On force la création locale à midi pour éviter les basculements UTC
+  const localDate = new Date(year, month - 1, day, 12, 0, 0);
+  return localDate.toLocaleDateString("fr-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+}
+
 function ProgressionView({ events, rules, belts, setBelts }) {
   const [form, setForm] = useState({ couleur: 'Blanche', date: '', feeling: '', invite: false });
   const since = (belts[belts.length-1]?.date) || lastPassageDate(events);
@@ -342,9 +454,14 @@ function ProgressionView({ events, rules, belts, setBelts }) {
   const total = groupPts + privatePts;
   const next = Object.entries(rules).find(([_, n]) => total < n);
 
+  // ✅ Correction du stockage de la date pour éviter tout décalage
   const addPass = () => {
     if (!form.date || !form.couleur) return;
-    setBelts(prev => [...prev, { ...form }]);
+
+    const [y, m, d] = form.date.split("-");
+    const fixedDate = `${y}-${m}-${d}`; // propre, sans conversion UTC
+
+    setBelts(prev => [...prev, { ...form, date: fixedDate }]);
     setForm({ ...form, date: '', feeling: '', invite: false });
   };
 
@@ -360,7 +477,14 @@ function ProgressionView({ events, rules, belts, setBelts }) {
           <div className="mt-3 flex items-center gap-2">
             <input type="checkbox" checked={form.invite} onChange={(e) => setForm({ ...form, invite: e.target.checked })} />
             <span className="text-sm">Invitation reçue ?</span>
-            {form.invite && <input type="date" className="border rounded p-1 text-sm" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />}
+            {form.invite && (
+              <input
+                type="date"
+                className="border rounded p-1 text-sm"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+              />
+            )}
           </div>
         </div>
         <div className="bg-white border rounded p-4">
@@ -369,8 +493,18 @@ function ProgressionView({ events, rules, belts, setBelts }) {
             <select className="border rounded p-2" value={form.couleur} onChange={(e)=>setForm({...form, couleur:e.target.value})}>
               {BELTS.map((b)=> <option key={b}>{b}</option>)}
             </select>
-            <input className="border rounded p-2" type="date" value={form.date} onChange={(e)=>setForm({...form, date:e.target.value})} />
-            <input className="border rounded p-2 sm:col-span-3" placeholder="Feeling / commentaire" value={form.feeling} onChange={(e)=>setForm({...form, feeling:e.target.value})} />
+            <input
+              className="border rounded p-2"
+              type="date"
+              value={form.date}
+              onChange={(e)=>setForm({...form, date:e.target.value})}
+            />
+            <input
+              className="border rounded p-2 sm:col-span-3"
+              placeholder="Feeling / commentaire"
+              value={form.feeling}
+              onChange={(e)=>setForm({...form, feeling:e.target.value})}
+            />
           </div>
           <button onClick={addPass} className="mt-3 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Ajouter</button>
         </div>
@@ -394,7 +528,9 @@ function ProgressionView({ events, rules, belts, setBelts }) {
 // Paramètres — profil, règles, planning avec bouton Ajouter
 // ==============================================================
 function SettingsView({ rules, setRules, planning, setPlanning, profil, setProfil }) {
-  const updateRule = (key, val) => setRules({ ...rules, [key]: parseInt(val, 10) || 0 });
+  // === Fonctions utilitaires ===
+  const updateRule = (key, val) =>
+    setRules({ ...rules, [key]: parseInt(val, 10) || 0 });
 
   const addCourse = (i) => {
     const copy = [...planning];
@@ -408,54 +544,139 @@ function SettingsView({ rules, setRules, planning, setPlanning, profil, setProfi
     setPlanning(copy);
   };
 
+  const deleteCourse = (i, j) => {
+    if (!window.confirm("Supprimer cet horaire ?")) return;
+    const copy = [...planning];
+    copy[i].cours.splice(j, 1);
+    setPlanning(copy);
+  };
+
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-4 text-red-600">⚙️ Paramètres</h2>
+      <h2 className="text-3xl font-bold mb-6 text-red-600 flex items-center gap-2">
+        <SettingsIcon className="text-red-600 w-7 h-7" />
+        Paramètres
+      </h2>
 
-      <div className="bg-white border rounded p-4 mb-6">
-        <h3 className="font-semibold mb-3">Profil</h3>
-        <select value={profil} onChange={(e) => setProfil(e.target.value)} className="border rounded p-2">
+      {/* === Profil === */}
+      <section className="bg-white border rounded-xl p-5 mb-6 shadow-sm">
+        <h3 className="font-semibold mb-3 flex items-center gap-2 text-gray-700">
+          <UserCog className="text-red-500 w-5 h-5" />
+          Profil actuel
+        </h3>
+        <select
+          value={profil}
+          onChange={(e) => setProfil(e.target.value)}
+          className="border rounded-lg p-2 text-gray-800 focus:ring-2 focus:ring-red-400"
+        >
           <option value="Enfant">Enfant</option>
           <option value="Ado">Ado</option>
           <option value="Adulte">Adulte</option>
         </select>
-      </div>
+      </section>
 
-      <div className="bg-white border rounded p-4 mb-6">
-        <h3 className="font-semibold mb-3">Règles de passage entre ceintures</h3>
-        {Object.entries(rules).map(([transition, count]) => (
-          <div key={transition} className="flex items-center gap-2 mb-2">
-            <label className="w-48">{transition.replace('→', ' → ')}</label>
-            <input type="number" value={count} onChange={(e) => updateRule(transition, e.target.value)} className="border rounded p-1 w-24" />
-            <span>cours</span>
-          </div>
-        ))}
-      </div>
+      {/* === Règles de passage === */}
+      <section className="bg-white border rounded-xl p-5 mb-6 shadow-sm">
+        <h3 className="font-semibold mb-4 flex items-center gap-2 text-gray-700">
+          <LineChart className="text-red-500 w-5 h-5" />
+          Règles de passage entre ceintures
+        </h3>
 
-      <div className="bg-white border rounded p-4">
-        <h3 className="font-semibold mb-3">Planning fixe hebdomadaire ({profil})</h3>
-        {planning.map((p, i) => (
-          <div key={i} className="mb-3">
-            <h4 className="font-semibold text-red-600 mb-1 flex justify-between items-center">
-              {p.jour}
-              <button onClick={() => addCourse(i)} className="text-green-600 flex items-center gap-1 text-sm"><PlusCircle className="w-4 h-4" /> Ajouter</button>
-            </h4>
-            {p.cours.map((c, j) => (
-              c.type === profil ? (
-                <div key={`${i}-${j}`} className="flex items-center gap-2 mb-1">
-                  <input className="border rounded p-1 flex-1" value={c.nom} onChange={(e) => updateCourse(i, j, 'nom', e.target.value)} />
-                  <input className="border rounded p-1 w-28" value={c.heure} onChange={(e) => updateCourse(i, j, 'heure', e.target.value)} />
-                  <select className="border rounded p-1" value={c.type} onChange={(e) => updateCourse(i, j, 'type', e.target.value)}>
-                    <option value="Enfant">Enfant</option>
-                    <option value="Ado">Ado</option>
-                    <option value="Adulte">Adulte</option>
-                  </select>
-                </div>
-              ) : null
-            ))}
-          </div>
-        ))}
-      </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {Object.entries(rules).map(([transition, count]) => (
+            <div
+              key={transition}
+              className="flex items-center justify-between bg-gray-50 border rounded-lg p-2 hover:bg-gray-100 transition"
+            >
+              <label className="font-medium text-sm text-gray-700 flex-1">
+                {transition.replace("→", " → ")}
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={count}
+                  onChange={(e) => updateRule(transition, e.target.value)}
+                  className="border rounded p-1 w-20 text-center text-gray-800"
+                />
+                <span className="text-sm text-gray-600">cours</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* === Planning fixe hebdomadaire === */}
+      <section className="bg-white border rounded-xl p-5 shadow-sm">
+        <h3 className="font-semibold mb-4 flex items-center gap-2 text-gray-700">
+          <CalendarDays className="text-red-500 w-5 h-5" />
+          Planning fixe hebdomadaire ({profil})
+        </h3>
+
+        <div className="space-y-4">
+          {planning.map((p, i) => (
+            <div key={i} className="border rounded-lg p-3 bg-gray-50 shadow-sm">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="font-semibold text-red-600">{p.jour}</h4>
+                <button
+                  onClick={() => addCourse(i)}
+                  className="text-green-600 hover:text-green-700 flex items-center gap-1 text-sm font-medium"
+                >
+                  <PlusCircle className="w-4 h-4" /> Ajouter un cours
+                </button>
+              </div>
+
+              {p.cours.filter(c => c.type === profil).length === 0 ? (
+                <p className="text-gray-400 text-sm italic">
+                  Aucun cours pour ce profil.
+                </p>
+              ) : (
+                p.cours
+                  .filter((c) => c.type === profil)
+                  .map((c, j) => (
+                    <div
+                      key={`${i}-${j}`}
+                      className="flex flex-wrap items-center gap-2 mb-2 bg-white p-2 rounded-lg border hover:shadow-sm transition"
+                    >
+                      <input
+                        className="border rounded p-1 flex-1 min-w-[150px] text-gray-800"
+                        value={c.nom}
+                        onChange={(e) =>
+                          updateCourse(i, j, "nom", e.target.value)
+                        }
+                      />
+                      <input
+                        className="border rounded p-1 w-28 text-gray-800"
+                        placeholder="Heure"
+                        value={c.heure}
+                        onChange={(e) =>
+                          updateCourse(i, j, "heure", e.target.value)
+                        }
+                      />
+                      <select
+                        className="border rounded p-1 text-gray-800"
+                        value={c.type}
+                        onChange={(e) =>
+                          updateCourse(i, j, "type", e.target.value)
+                        }
+                      >
+                        <option value="Enfant">Enfant</option>
+                        <option value="Ado">Ado</option>
+                        <option value="Adulte">Adulte</option>
+                      </select>
+                      <button
+                        onClick={() => deleteCourse(i, j)}
+                        className="text-red-500 hover:text-red-700 ml-1"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
