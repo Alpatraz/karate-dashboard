@@ -1,8 +1,42 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Target, Trophy, LineChart, Calendar } from "lucide-react";
+import { Target, Trophy } from "lucide-react";
+
+// util date courte
+function fmtDay(d) {
+  if (!d) return "—";
+  const [y, m, dd] = d.split("-");
+  const date = new Date(y, m - 1, dd, 12, 0, 0);
+  return date.toLocaleDateString("fr-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+// util mois+année
+function fmtMonthYear(dateObj) {
+  if (!dateObj) return "—";
+  return dateObj.toLocaleDateString("fr-CA", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+// retrouve la dernière ceinture réelle (invite=false)
+function getCurrentBelt(belts) {
+  const realBelts = belts.filter((b) => !b.invite);
+  return realBelts.length ? realBelts[realBelts.length - 1] : null;
+}
+
+// retrouve l'invitation en attente (invite=true, la plus récente)
+function getPendingInvite(belts) {
+  for (let i = belts.length - 1; i >= 0; i--) {
+    if (belts[i].invite) return belts[i];
+  }
+  return null;
+}
 
 export default function DashboardView() {
-  // === Lecture des données locales ===
   const [events, setEvents] = useState([]);
   const [rules, setRules] = useState({});
   const [belts, setBelts] = useState([]);
@@ -13,41 +47,15 @@ export default function DashboardView() {
     setBelts(JSON.parse(localStorage.getItem("karate_belts") || "[]"));
   }, []);
 
-  // === Utils ===
-  const fmtDay = (d) =>
-    d
-      ? new Date(d).toLocaleDateString("fr-CA", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        })
-      : "—";
+  // données utiles ceinture actuelle
+  const currentBelt = getCurrentBelt(belts);
+  const currentBeltColor = currentBelt?.couleur || "Blanche";
+  const currentBeltDate = currentBelt?.date || null;
 
-  const fmtMonthYear = (dateObj) =>
-    dateObj
-      ? dateObj.toLocaleDateString("fr-CA", {
-          month: "long",
-          year: "numeric",
-        })
-      : "—";
+  // date de début pour compter les cours faits
+  const sinceDate = currentBeltDate || null;
 
-  // Dernière ceinture obtenue
-  const lastBeltObj = belts[belts.length - 1] || null;
-  const currentBeltColor = lastBeltObj?.couleur || "Blanche";
-  const currentBeltDate = lastBeltObj?.date || null;
-
-  // Date du dernier passage (fallback si pas dans belts)
-  const fallbackPassageDate = useMemo(() => {
-    const pass = [...events]
-      .filter((e) => e.type === "passage" && e.status === "fait" && e.date)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .pop();
-    return pass?.date || null;
-  }, [events]);
-
-  const sinceDate = currentBeltDate || fallbackPassageDate || null;
-
-  // Cours faits depuis cette date
+  // cours faits depuis cette ceinture
   const doneEventsSince = events.filter(
     (e) => e.status === "fait" && (!sinceDate || e.date >= sinceDate)
   );
@@ -55,60 +63,79 @@ export default function DashboardView() {
   const groupCount = doneEventsSince.filter((e) => e.type === "groupe").length;
   const privateCount =
     doneEventsSince.filter((e) => e.type === "privé").length * 4;
-
   const totalDone = groupCount + privateCount;
 
-  // Trouver la prochaine ceinture et le nombre requis
-  // `rules` ressemble à { "Verte / Bleue→Bleue": 80, ... }
-  // On cherche l'entrée qui commence par la ceinture actuelle
-  const progressionRuleEntry = Object.entries(rules).find(([transition]) =>
-    transition.startsWith(currentBeltColor)
-  );
-
-  const nextBeltColor = progressionRuleEntry
-    ? progressionRuleEntry[0].split("→")[1]
+  // règle de progression à partir de la ceinture actuelle
+  const progressionRuleEntry = currentBelt
+    ? Object.entries(rules).find(([transition]) =>
+        transition.startsWith(currentBelt.couleur)
+      )
     : null;
 
+  // la "prochaine ceinture prévue"
+  // cas 1 : on a une invitation officielle => on affiche cette ceinture + "Date réelle"
+  // cas 2 : pas d'invite => on lit la couleur dans la règle "X→Y"
+  const invite = getPendingInvite(belts);
+
+  let nextBeltColor = null;
+  if (invite) {
+    nextBeltColor = invite.couleur; // ex. "Bleue"
+  } else if (progressionRuleEntry) {
+    nextBeltColor = progressionRuleEntry[0].split("→")[1]; // ex "Verte / Bleue→Bleue"
+  }
+
+  // requis total pour atteindre la prochaine ceinture
   const requiredForNext = progressionRuleEntry
     ? progressionRuleEntry[1]
-    : totalDone; // si pas de règle trouvée, on considère qu'il n'y a plus rien à faire
-
+    : totalDone;
   const remaining = Math.max(requiredForNext - totalDone, 0);
 
-  // Progression %
+  // % progression
   const progressPct = requiredForNext
     ? Math.min((totalDone / requiredForNext) * 100, 100)
     : 100;
 
-  // --- Calcul vitesse hebdo (moyenne des cours faits sur 8 dernières semaines) ---
-  // fenêtre: 56 jours
+  // vitesse hebdo (8 dernières semaines glissantes)
   const now = new Date();
   const eightWeeksAgo = new Date();
   eightWeeksAgo.setDate(now.getDate() - 56);
 
   const doneLast8Weeks = doneEventsSince.filter((e) => {
     if (!e.date) return false;
-    const d = new Date(e.date + "T12:00:00"); // force midi pour éviter fuseau
-    return d >= eightWeeksAgo && d <= now;
+    const [y, m, d] = e.date.split("-");
+    const dateObj = new Date(y, m - 1, d, 12, 0, 0);
+    return dateObj >= eightWeeksAgo && dateObj <= now;
   });
 
-  // On compte les "cours faits" façon points réels (groupe =1, privé=4)
   const doneLast8WeeksPoints =
     doneLast8Weeks.filter((e) => e.type === "groupe").length +
     doneLast8Weeks.filter((e) => e.type === "privé").length * 4;
 
   const weeklyRateRaw = doneLast8WeeksPoints / 8;
-  // sécurité: si 0 on met 1 pour éviter division par 0
   const weeklyRate = weeklyRateRaw > 0 ? weeklyRateRaw : 1;
 
-  // --- Estimation nombre de semaines restantes ---
-  const weeksRemaining = remaining > 0 ? Math.ceil(remaining / weeklyRate) : 0;
+  // estimation temps restant si pas encore invitation officielle
+  const weeksRemaining =
+    !invite && remaining > 0
+      ? Math.ceil(remaining / weeklyRate)
+      : 0;
 
-  // Estimation de la date du prochain passage
   const estimatedDateObj = new Date();
   estimatedDateObj.setDate(now.getDate() + weeksRemaining * 7);
 
-  // Prochains entraînements (inchangé)
+  // message/date à afficher dans la carte verte
+  const nextBeltDateLabel = invite
+    ? "Date réelle"
+    : "Date estimée";
+
+  const nextBeltDateText = invite
+    ? fmtMonthYear(new Date(invite.date + "T12:00:00"))
+    : fmtMonthYear(estimatedDateObj);
+
+  // objectifs texte
+  const objectifTxt = currentBeltColor + " → " + (nextBeltColor || "—");
+
+  // prochains entraînements
   const todayISO = new Date().toISOString().split("T")[0];
   const upcoming = useMemo(() => {
     return events
@@ -117,15 +144,19 @@ export default function DashboardView() {
       .slice(0, 3);
   }, [events, todayISO]);
 
+  // style visuel de la carte "prochaine ceinture"
+  const cardBg = "bg-green-100";
+  const cardText = "text-gray-800";
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">
         Tableau de bord principal
       </h1>
 
-      {/* === Cartes du haut === */}
+      {/* LIGNE DE CARTES */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Carte 1 : Ceinture actuelle */}
+        {/* Carte Ceinture actuelle */}
         <div className="bg-white shadow rounded-xl p-5 border border-gray-100">
           <div className="flex items-center gap-3 mb-2">
             <Target className="text-red-600" size={24} />
@@ -137,11 +168,11 @@ export default function DashboardView() {
             {currentBeltColor}
           </p>
           <p className="text-sm text-gray-500">
-            Depuis {fmtDay(currentBeltDate || fallbackPassageDate)}
+            Depuis {currentBeltDate ? fmtDay(currentBeltDate) : "—"}
           </p>
         </div>
 
-        {/* Carte 2 : Cours faits / requis */}
+        {/* Carte Cours faits / requis */}
         <div className="bg-white shadow rounded-xl p-5 border border-gray-100">
           <div className="flex items-center gap-3 mb-2">
             <Trophy className="text-red-600" size={24} />
@@ -150,68 +181,71 @@ export default function DashboardView() {
             </h2>
           </div>
           <p className="text-xl font-bold text-gray-800">
-            {totalDone} {requiredForNext ? <>/ {requiredForNext}</> : null}
+            {totalDone}
+            {requiredForNext ? <> / {requiredForNext}</> : null}
           </p>
-          <p className="text-sm text-gray-500">Depuis la dernière ceinture</p>
+          <p className="text-sm text-gray-500">
+            Depuis la dernière ceinture
+          </p>
         </div>
 
-        {/* Carte 3 : Prochaine ceinture prévue (ex-"Progression globale") */}
-        <div className="bg-white shadow rounded-xl p-5 border border-gray-100">
+        {/* Carte Prochaine ceinture */}
+        <div
+          className={`shadow rounded-xl p-5 border border-gray-200 ${cardBg} ${cardText} transition-colors`}
+        >
           <div className="flex items-start gap-3 mb-2">
-            <LineChart className="text-red-600 mt-1" size={24} />
+            <div className="text-2xl leading-none">🥋</div>
             <div>
-              <h2 className="text-lg font-semibold text-red-600 leading-tight">
+              <h2 className="text-lg font-semibold leading-tight text-gray-800">
                 Prochaine ceinture prévue
               </h2>
-              <p className="text-xl font-bold text-gray-800">
+              <p className="text-xl font-bold text-gray-900">
                 {nextBeltColor || "—"}{" "}
-                {weeksRemaining === 0 && remaining === 0
-                  ? "— prêt"
-                  : `– ${fmtMonthYear(estimatedDateObj)}`}
+                {nextBeltDateText ? `– ${nextBeltDateText}` : ""}
               </p>
-              <p className="text-sm text-gray-500">
-                Date estimée ou réelle
+              <p className="text-sm text-gray-600">
+                {nextBeltDateLabel}
               </p>
             </div>
           </div>
 
           {/* Barre de progression */}
-          <div className="w-full bg-gray-200 h-2 rounded mt-3">
-            <div
-              className="bg-red-600 h-2 rounded"
-              style={{ width: `${Math.round(progressPct)}%` }}
-            ></div>
-          </div>
+          {!invite && (
+            <div className="w-full bg-gray-200 h-2 rounded mt-3">
+              <div
+                className="bg-green-600 h-2 rounded"
+                style={{ width: `${Math.round(progressPct)}%` }}
+              />
+            </div>
+          )}
 
           <div className="text-sm text-gray-700 mt-3 leading-snug">
             <p>
               <b>{totalDone}</b> cours faits,
               <b> {remaining}</b> restants
-              {requiredForNext ? (
-                <> / {requiredForNext} requis</>
-              ) : null}
+              {requiredForNext ? <> / {requiredForNext} requis</> : null}
             </p>
             <p>
               Rythme actuel :{" "}
-              <b>{weeklyRate.toFixed(1)}</b> cours / semaine
+              <b>{weeklyRate.toFixed(1)}</b> / semaine
             </p>
-            <p>
-              Estimation :{" "}
-              <b>
-                {weeksRemaining} semaine
-                {weeksRemaining > 1 ? "s" : ""} restantes
-              </b>
-            </p>
-            {nextBeltColor && (
-              <p className="text-xs text-gray-500 mt-1">
-                Objectif : {currentBeltColor} → {nextBeltColor}
+            {!invite && (
+              <p>
+                Estimation :{" "}
+                <b>
+                  {weeksRemaining} semaine
+                  {weeksRemaining > 1 ? "s" : ""} restantes
+                </b>
               </p>
             )}
+            <p className="text-xs text-gray-600 mt-1">
+              Objectif : {objectifTxt}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* === Prochains entraînements === */}
+      {/* PROCHAINS ENTRAÎNEMENTS */}
       <div>
         <h2 className="text-lg font-semibold text-gray-800 mb-3">
           📅 Prochains entraînements
@@ -225,7 +259,9 @@ export default function DashboardView() {
                 key={i}
                 className="bg-white p-4 rounded-xl shadow border border-gray-100"
               >
-                <p className="text-red-600 font-semibold">{fmtDay(e.date)}</p>
+                <p className="text-red-600 font-semibold">
+                  {fmtDay(e.date)}
+                </p>
                 <p className="font-medium text-gray-800">{e.title}</p>
                 <p className="text-sm text-gray-500">
                   {e.time || "—"} · {e.type}
