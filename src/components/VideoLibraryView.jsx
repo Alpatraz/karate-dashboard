@@ -1,22 +1,28 @@
 import { useState, useEffect } from "react";
 
 export default function VideoLibraryView() {
-  const [videos, setVideos] = useState(() => JSON.parse(localStorage.getItem("karate_videos") || "[]"));
+  const [videos, setVideos] = useState(() =>
+    JSON.parse(localStorage.getItem("karate_videos") || "[]")
+  );
   const [filter, setFilter] = useState("Tous");
+  const [search, setSearch] = useState(""); // 🔍 recherche texte
   const [showAddVideo, setShowAddVideo] = useState(false);
   const [showAddChannel, setShowAddChannel] = useState(false);
+  const [showEdit, setShowEdit] = useState(null);
   const [newVideo, setNewVideo] = useState({ url: "", titre: "", theme: "Autre" });
   const [newChannel, setNewChannel] = useState({ url: "", titre: "", theme: "Autre" });
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => localStorage.setItem("karate_videos", JSON.stringify(videos)), [videos]);
+  useEffect(() => {
+    localStorage.setItem("karate_videos", JSON.stringify(videos));
+  }, [videos]);
 
   const themes = ["Tous", "Kata", "Kick", "Renforcement", "Armes", "Bloc", "Combat", "Autre"];
 
   const addVideo = () => {
     if (!newVideo.url || !newVideo.titre) return alert("Titre et URL requis");
     const v = { ...newVideo, favori: false, type: "single" };
-    setVideos(prev => [...prev, v]);
+    setVideos((prev) => [...prev, v]);
     setNewVideo({ url: "", titre: "", theme: "Autre" });
     setShowAddVideo(false);
   };
@@ -28,16 +34,25 @@ export default function VideoLibraryView() {
       url: newChannel.url,
       theme: newChannel.theme,
       favori: false,
-      type: "channel"
+      type: "channel",
     }));
-    setVideos(prev => [...prev, ...mockVids]);
+    setVideos((prev) => [...prev, ...mockVids]);
     setNewChannel({ url: "", titre: "", theme: "Autre" });
     setShowAddChannel(false);
   };
 
-  const filtrées = videos.filter(v => filter === "Tous" || v.theme === filter);
+  const deleteVideo = (index) => {
+    if (confirm("Supprimer cette vidéo ?")) {
+      setVideos((prev) => prev.filter((_, i) => i !== index));
+    }
+  };
 
-  // 🔗 Fonction pour transformer les URLs en version intégrable
+  const editVideo = (index, updated) => {
+    const copy = [...videos];
+    copy[index] = { ...copy[index], ...updated };
+    setVideos(copy);
+  };
+
   const extractEmbed = (url) => {
     try {
       if (url.includes("youtube.com") || url.includes("youtu.be")) {
@@ -46,30 +61,31 @@ export default function VideoLibraryView() {
         else id = url.split("/").filter(Boolean).pop();
         return `https://www.youtube.com/embed/${id}`;
       }
-      if (url.includes("tiktok.com")) {
-        return url.replace("www.", "www.tiktok.com/embed/");
-      }
+      if (url.includes("tiktok.com")) return url.replace("www.", "www.tiktok.com/embed/");
       if (url.includes("facebook.com") || url.includes("fb.watch")) {
         const cleanUrl = encodeURIComponent(url);
         return `https://www.facebook.com/plugins/video.php?href=${cleanUrl}&show_text=false`;
       }
       return url;
-    } catch (e) {
-      console.error("Erreur d’analyse d’URL :", e);
+    } catch {
       return url;
     }
   };
 
-  // ✅ Vérifie si une vidéo peut être intégrée
-  const canEmbed = (url) => {
-    return url.includes("youtube.com") || url.includes("youtu.be");
-  };
+  const canEmbed = (url) => url.includes("youtube.com") || url.includes("youtu.be");
 
   const toggleFavori = (index) => {
     const copy = [...videos];
     copy[index].favori = !copy[index].favori;
     setVideos(copy);
   };
+
+  // === Filtrage combiné par thème et recherche ===
+  const filtrées = videos.filter((v) => {
+    const matchTheme = filter === "Tous" || v.theme === filter;
+    const matchSearch = v.titre.toLowerCase().includes(search.toLowerCase());
+    return matchTheme && matchSearch;
+  });
 
   return (
     <div>
@@ -92,47 +108,80 @@ export default function VideoLibraryView() {
         </div>
       </div>
 
-      {/* ======== Filtres ======== */}
-      <div className="flex gap-3 mb-4">
+      {/* ======== Filtres et recherche ======== */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="border p-2 rounded"
+          className="border p-2 rounded w-full sm:w-auto"
         >
-          {themes.map((t) => <option key={t}>{t}</option>)}
+          {themes.map((t) => (
+            <option key={t}>{t}</option>
+          ))}
         </select>
+
+        {/* 🔍 Barre de recherche */}
+        <input
+          type="text"
+          placeholder="🔍 Rechercher une vidéo..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border p-2 rounded flex-1"
+        />
       </div>
 
       {/* ======== Liste de vidéos ======== */}
       {filtrées.length === 0 && (
-        <p className="text-gray-500 text-center mt-10">Aucune vidéo trouvée.</p>
+        <p className="text-gray-500 text-center mt-10">
+          Aucune vidéo trouvée.
+        </p>
       )}
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtrées.map((v, i) => (
           <div
             key={i}
-            onClick={() => {
-              if (canEmbed(v.url)) setSelected(v);
-              else window.open(v.url, "_blank"); // ouvre la vidéo externe
-            }}
-            className="bg-white border rounded shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden"
+            className="bg-white border rounded shadow-sm hover:shadow-md transition overflow-hidden relative"
           >
-            <div className="h-40 bg-gray-200 flex items-center justify-center relative overflow-hidden rounded-t">
-  {canEmbed(v.url) ? (
-    <iframe
-      src={extractEmbed(v.url)}
-      title={v.titre}
-      className="w-full h-full object-cover"
-      allowFullScreen
-    ></iframe>
-  ) : (
-    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 text-sm text-center px-2">
-      🌐 Vidéo externe<br />
-      <span className="text-xs text-gray-500">Clique pour ouvrir</span>
-    </div>
-  )}
-</div>
+            {/* Boutons modifier/supprimer */}
+            <div className="absolute top-2 right-2 flex gap-2">
+              <button
+                onClick={() => setShowEdit({ ...v, index: i })}
+                className="bg-yellow-400 text-white px-2 py-1 rounded text-xs hover:bg-yellow-500"
+              >
+                ✏️
+              </button>
+              <button
+                onClick={() => deleteVideo(i)}
+                className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
+              >
+                🗑️
+              </button>
+            </div>
+
+            <div
+              onClick={() => {
+                if (canEmbed(v.url)) setSelected(v);
+                else window.open(v.url, "_blank");
+              }}
+              className="aspect-video bg-gray-200 flex items-center justify-center cursor-pointer"
+            >
+              {canEmbed(v.url) ? (
+                <iframe
+                  src={extractEmbed(v.url)}
+                  title={v.titre}
+                  className="w-full h-full"
+                  allowFullScreen
+                ></iframe>
+              ) : (
+                <div className="text-gray-400 text-sm text-center">
+                  🌐 Vidéo externe<br />
+                  <span className="text-xs text-gray-500">
+                    Clique pour ouvrir
+                  </span>
+                </div>
+              )}
+            </div>
 
             <div className="p-3">
               <h4 className="font-semibold flex justify-between items-center mb-1">
@@ -176,37 +225,74 @@ export default function VideoLibraryView() {
         </div>
       )}
 
-      {/* ======== Pop-up : Ajouter une vidéo ======== */}
-      {showAddVideo && (
+      {/* ======== Pop-up : Ajouter / Modifier une vidéo ======== */}
+      {(showAddVideo || showEdit) && (
         <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
-            <h3 className="text-lg font-bold mb-3">➕ Ajouter une vidéo</h3>
+            <h3 className="text-lg font-bold mb-3">
+              {showEdit ? "✏️ Modifier la vidéo" : "➕ Ajouter une vidéo"}
+            </h3>
             <input
               type="text"
               placeholder="Titre"
-              value={newVideo.titre}
-              onChange={(e) => setNewVideo({ ...newVideo, titre: e.target.value })}
+              value={showEdit ? showEdit.titre : newVideo.titre}
+              onChange={(e) =>
+                showEdit
+                  ? setShowEdit({ ...showEdit, titre: e.target.value })
+                  : setNewVideo({ ...newVideo, titre: e.target.value })
+              }
               className="border p-2 rounded w-full mb-2"
             />
             <input
               type="text"
-              placeholder="URL (YouTube, TikTok, Facebook)"
-              value={newVideo.url}
-              onChange={(e) => setNewVideo({ ...newVideo, url: e.target.value })}
+              placeholder="URL"
+              value={showEdit ? showEdit.url : newVideo.url}
+              onChange={(e) =>
+                showEdit
+                  ? setShowEdit({ ...showEdit, url: e.target.value })
+                  : setNewVideo({ ...newVideo, url: e.target.value })
+              }
               className="border p-2 rounded w-full mb-2"
             />
             <select
-              value={newVideo.theme}
-              onChange={(e) => setNewVideo({ ...newVideo, theme: e.target.value })}
+              value={showEdit ? showEdit.theme : newVideo.theme}
+              onChange={(e) =>
+                showEdit
+                  ? setShowEdit({ ...showEdit, theme: e.target.value })
+                  : setNewVideo({ ...newVideo, theme: e.target.value })
+              }
               className="border p-2 rounded w-full mb-4"
             >
-              {themes.map((t) => <option key={t}>{t}</option>)}
+              {themes.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
             </select>
             <div className="flex justify-between">
-              <button onClick={addVideo} className="bg-red-600 text-white px-4 py-2 rounded">
-                Ajouter
-              </button>
-              <button onClick={() => setShowAddVideo(false)} className="text-gray-600">
+              {showEdit ? (
+                <button
+                  onClick={() => {
+                    editVideo(showEdit.index, showEdit);
+                    setShowEdit(null);
+                  }}
+                  className="bg-yellow-500 text-white px-4 py-2 rounded"
+                >
+                  Sauvegarder
+                </button>
+              ) : (
+                <button
+                  onClick={addVideo}
+                  className="bg-red-600 text-white px-4 py-2 rounded"
+                >
+                  Ajouter
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setShowEdit(null);
+                  setShowAddVideo(false);
+                }}
+                className="text-gray-600"
+              >
                 Annuler
               </button>
             </div>
@@ -223,28 +309,42 @@ export default function VideoLibraryView() {
               type="text"
               placeholder="Nom de la chaîne"
               value={newChannel.titre}
-              onChange={(e) => setNewChannel({ ...newChannel, titre: e.target.value })}
+              onChange={(e) =>
+                setNewChannel({ ...newChannel, titre: e.target.value })
+              }
               className="border p-2 rounded w-full mb-2"
             />
             <input
               type="text"
               placeholder="URL de la chaîne"
               value={newChannel.url}
-              onChange={(e) => setNewChannel({ ...newChannel, url: e.target.value })}
+              onChange={(e) =>
+                setNewChannel({ ...newChannel, url: e.target.value })
+              }
               className="border p-2 rounded w-full mb-2"
             />
             <select
               value={newChannel.theme}
-              onChange={(e) => setNewChannel({ ...newChannel, theme: e.target.value })}
+              onChange={(e) =>
+                setNewChannel({ ...newChannel, theme: e.target.value })
+              }
               className="border p-2 rounded w-full mb-4"
             >
-              {themes.map((t) => <option key={t}>{t}</option>)}
+              {themes.map((t) => (
+                <option key={t}>{t}</option>
+              ))}
             </select>
             <div className="flex justify-between">
-              <button onClick={addChannel} className="bg-gray-700 text-white px-4 py-2 rounded">
+              <button
+                onClick={addChannel}
+                className="bg-gray-700 text-white px-4 py-2 rounded"
+              >
                 Ajouter
               </button>
-              <button onClick={() => setShowAddChannel(false)} className="text-gray-600">
+              <button
+                onClick={() => setShowAddChannel(false)}
+                className="text-gray-600"
+              >
                 Annuler
               </button>
             </div>
