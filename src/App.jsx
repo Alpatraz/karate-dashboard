@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Target, Calendar as CalendarIcon, BookOpen, LineChart, Settings as SettingsIcon, CheckCircle, XCircle, Clock, PlusCircle } from "lucide-react";
 import { Trophy, DollarSign, Home, Play, Users, Heart } from "lucide-react";
 import VideoLibraryView from "./components/VideoLibraryView";
+import DashboardView from "./components/DashboardView";
 
 // ==============================================================
 // Constantes & Helpers
@@ -133,7 +134,7 @@ export default function KarateDashboard() {
       </aside>
 
       <main className="flex-1 p-6 overflow-y-auto">
-        {activeTab === "Tableau de bord" && <DashboardView events={events} rules={rules} belts={belts} />}
+        {activeTab === "Tableau de bord" && <DashboardView />}
         {activeTab === "Calendrier" && <CalendarView events={events} setEvents={setEvents} planning={planning} profil={profil} holidays={holidays} />}
         {activeTab === "Base technique" && <BaseTechniqueView profil={profil} />}
         {activeTab === "Vidéos" && <VideoLibraryView />}
@@ -155,29 +156,7 @@ function lastPassageDate(events) {
   return pass?.date || null;
 }
 
-function DashboardView({ events, rules, belts }) {
-  const since = (belts[belts.length-1]?.date) || lastPassageDate(events);
-  const done = events.filter(e => e.status === 'fait' && (!since || e.date >= since));
-  const groupPts = done.filter(e => e.type === 'groupe').length;
-  const privatePts = done.filter(e => e.type === 'privé').length * 4;
-  const total = groupPts + privatePts;
-  const next = Object.entries(rules).find(([_, n]) => total < n);
 
-  return (
-    <div>
-      <h2 className="text-2xl font-bold mb-4">Tableau de bord</h2>
-      <div className="grid md:grid-cols-3 gap-4 mb-4">
-        <div className="bg-white border rounded p-4"><p className="text-sm text-gray-500">Depuis</p><p className="text-xl font-bold">{since ? fmt(since) : '—'}</p></div>
-        <div className="bg-white border rounded p-4"><p className="text-sm text-gray-500">Points groupe</p><p className="text-xl font-bold">{groupPts}</p></div>
-        <div className="bg-white border rounded p-4"><p className="text-sm text-gray-500">Points privés (×4)</p><p className="text-xl font-bold">{privatePts}</p></div>
-      </div>
-      <p>Total points (depuis dernière ceinture) : <b>{total}</b></p>
-      {next ? (
-        <p>Prochaine étape : {next[0]} — Reste <b>{next[1]-total}</b></p>
-      ) : <p>🎉 Toutes les étapes franchies !</p>}
-    </div>
-  );
-}
 
 // ==============================================================
 // Calendrier — ajout d’événements + pré-remplissage récurrent (jours fériés exclus)
