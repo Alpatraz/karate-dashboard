@@ -1,0 +1,256 @@
+import { useState, useEffect } from "react";
+
+export default function VideoLibraryView() {
+  const [videos, setVideos] = useState(() => JSON.parse(localStorage.getItem("karate_videos") || "[]"));
+  const [filter, setFilter] = useState("Tous");
+  const [showAddVideo, setShowAddVideo] = useState(false);
+  const [showAddChannel, setShowAddChannel] = useState(false);
+  const [newVideo, setNewVideo] = useState({ url: "", titre: "", theme: "Autre" });
+  const [newChannel, setNewChannel] = useState({ url: "", titre: "", theme: "Autre" });
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => localStorage.setItem("karate_videos", JSON.stringify(videos)), [videos]);
+
+  const themes = ["Tous", "Kata", "Kick", "Renforcement", "Armes", "Bloc", "Combat", "Autre"];
+
+  const addVideo = () => {
+    if (!newVideo.url || !newVideo.titre) return alert("Titre et URL requis");
+    const v = { ...newVideo, favori: false, type: "single" };
+    setVideos(prev => [...prev, v]);
+    setNewVideo({ url: "", titre: "", theme: "Autre" });
+    setShowAddVideo(false);
+  };
+
+  const addChannel = () => {
+    if (!newChannel.url || !newChannel.titre) return alert("Nom et URL requis");
+    const mockVids = Array.from({ length: 5 }).map((_, i) => ({
+      titre: `${newChannel.titre} — vidéo ${i + 1}`,
+      url: newChannel.url,
+      theme: newChannel.theme,
+      favori: false,
+      type: "channel"
+    }));
+    setVideos(prev => [...prev, ...mockVids]);
+    setNewChannel({ url: "", titre: "", theme: "Autre" });
+    setShowAddChannel(false);
+  };
+
+  const filtrées = videos.filter(v => filter === "Tous" || v.theme === filter);
+
+  // 🔗 Fonction pour transformer les URLs en version intégrable
+  const extractEmbed = (url) => {
+    try {
+      if (url.includes("youtube.com") || url.includes("youtu.be")) {
+        let id = "";
+        if (url.includes("v=")) id = new URL(url).searchParams.get("v");
+        else id = url.split("/").filter(Boolean).pop();
+        return `https://www.youtube.com/embed/${id}`;
+      }
+      if (url.includes("tiktok.com")) {
+        return url.replace("www.", "www.tiktok.com/embed/");
+      }
+      if (url.includes("facebook.com") || url.includes("fb.watch")) {
+        const cleanUrl = encodeURIComponent(url);
+        return `https://www.facebook.com/plugins/video.php?href=${cleanUrl}&show_text=false`;
+      }
+      return url;
+    } catch (e) {
+      console.error("Erreur d’analyse d’URL :", e);
+      return url;
+    }
+  };
+
+  // ✅ Vérifie si une vidéo peut être intégrée
+  const canEmbed = (url) => {
+    return url.includes("youtube.com") || url.includes("youtu.be");
+  };
+
+  const toggleFavori = (index) => {
+    const copy = [...videos];
+    copy[index].favori = !copy[index].favori;
+    setVideos(copy);
+  };
+
+  return (
+    <div>
+      {/* ======== Barre d’action ======== */}
+      <div className="flex flex-wrap justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">🎥 Bibliothèque vidéo</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowAddVideo(true)}
+            className="bg-red-600 text-white px-3 py-2 rounded hover:bg-red-700"
+          >
+            ➕ Ajouter une vidéo
+          </button>
+          <button
+            onClick={() => setShowAddChannel(true)}
+            className="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-800"
+          >
+            📺 Ajouter une chaîne
+          </button>
+        </div>
+      </div>
+
+      {/* ======== Filtres ======== */}
+      <div className="flex gap-3 mb-4">
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="border p-2 rounded"
+        >
+          {themes.map((t) => <option key={t}>{t}</option>)}
+        </select>
+      </div>
+
+      {/* ======== Liste de vidéos ======== */}
+      {filtrées.length === 0 && (
+        <p className="text-gray-500 text-center mt-10">Aucune vidéo trouvée.</p>
+      )}
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtrées.map((v, i) => (
+          <div
+            key={i}
+            onClick={() => {
+              if (canEmbed(v.url)) setSelected(v);
+              else window.open(v.url, "_blank"); // ouvre la vidéo externe
+            }}
+            className="bg-white border rounded shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden"
+          >
+            <div className="h-40 bg-gray-200 flex items-center justify-center relative overflow-hidden rounded-t">
+  {canEmbed(v.url) ? (
+    <iframe
+      src={extractEmbed(v.url)}
+      title={v.titre}
+      className="w-full h-full object-cover"
+      allowFullScreen
+    ></iframe>
+  ) : (
+    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 text-sm text-center px-2">
+      🌐 Vidéo externe<br />
+      <span className="text-xs text-gray-500">Clique pour ouvrir</span>
+    </div>
+  )}
+</div>
+
+            <div className="p-3">
+              <h4 className="font-semibold flex justify-between items-center mb-1">
+                {v.titre}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleFavori(i);
+                  }}
+                >
+                  {v.favori ? "⭐" : "☆"}
+                </button>
+              </h4>
+              <p className="text-sm text-gray-600">{v.theme}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ======== Visionneuse ======== */}
+      {selected && (
+        <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg p-4 w-11/12 md:w-3/4 lg:w-1/2 relative">
+            <button
+              onClick={() => setSelected(null)}
+              className="absolute top-2 right-3 text-gray-600 hover:text-red-600"
+            >
+              ✖
+            </button>
+            <h3 className="font-bold text-red-600 mb-2">{selected.titre}</h3>
+            <div className="aspect-video mb-3">
+              <iframe
+                src={extractEmbed(selected.url)}
+                title={selected.titre}
+                allowFullScreen
+                className="w-full h-full rounded"
+              ></iframe>
+            </div>
+            <p className="text-sm text-gray-500">{selected.theme}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ======== Pop-up : Ajouter une vidéo ======== */}
+      {showAddVideo && (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
+            <h3 className="text-lg font-bold mb-3">➕ Ajouter une vidéo</h3>
+            <input
+              type="text"
+              placeholder="Titre"
+              value={newVideo.titre}
+              onChange={(e) => setNewVideo({ ...newVideo, titre: e.target.value })}
+              className="border p-2 rounded w-full mb-2"
+            />
+            <input
+              type="text"
+              placeholder="URL (YouTube, TikTok, Facebook)"
+              value={newVideo.url}
+              onChange={(e) => setNewVideo({ ...newVideo, url: e.target.value })}
+              className="border p-2 rounded w-full mb-2"
+            />
+            <select
+              value={newVideo.theme}
+              onChange={(e) => setNewVideo({ ...newVideo, theme: e.target.value })}
+              className="border p-2 rounded w-full mb-4"
+            >
+              {themes.map((t) => <option key={t}>{t}</option>)}
+            </select>
+            <div className="flex justify-between">
+              <button onClick={addVideo} className="bg-red-600 text-white px-4 py-2 rounded">
+                Ajouter
+              </button>
+              <button onClick={() => setShowAddVideo(false)} className="text-gray-600">
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======== Pop-up : Ajouter une chaîne ======== */}
+      {showAddChannel && (
+        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-lg">
+            <h3 className="text-lg font-bold mb-3">📺 Ajouter une chaîne</h3>
+            <input
+              type="text"
+              placeholder="Nom de la chaîne"
+              value={newChannel.titre}
+              onChange={(e) => setNewChannel({ ...newChannel, titre: e.target.value })}
+              className="border p-2 rounded w-full mb-2"
+            />
+            <input
+              type="text"
+              placeholder="URL de la chaîne"
+              value={newChannel.url}
+              onChange={(e) => setNewChannel({ ...newChannel, url: e.target.value })}
+              className="border p-2 rounded w-full mb-2"
+            />
+            <select
+              value={newChannel.theme}
+              onChange={(e) => setNewChannel({ ...newChannel, theme: e.target.value })}
+              className="border p-2 rounded w-full mb-4"
+            >
+              {themes.map((t) => <option key={t}>{t}</option>)}
+            </select>
+            <div className="flex justify-between">
+              <button onClick={addChannel} className="bg-gray-700 text-white px-4 py-2 rounded">
+                Ajouter
+              </button>
+              <button onClick={() => setShowAddChannel(false)} className="text-gray-600">
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
