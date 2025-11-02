@@ -93,19 +93,18 @@ export default function CalendarEnhancedView({
   // cours du planning pour ce jour précis
   const autoLessonsForDay = useMemo(() => {
     if (!planning) return [];
-    const wd = weekdayFr(selectedDate); // ex. "Lundi"
+    const wd = weekdayFr(selectedDate);
     const bloc = planning.find((p) => p.jour === wd);
     if (!bloc) return [];
-    // on renvoie une liste d'objets dans le même style que nos events
+  
     return bloc.cours.map((c) => ({
-      title: c.nom,
-      time: c.heure,
-      type: c.type || "groupe",
+      title: c.nom || "Cours de groupe",
+      time: c.heure || "",
+      type: "groupe", // ✅ Forcer explicitement le type à "groupe"
       date: selectedDate,
       status: "planifié",
-      // ATTENTION: pas d'id unique ici, on matchera par title+time+date
     }));
-  }, [planning, selectedDate]);
+  }, [planning, selectedDate]);  
 
   // maintenant on combine :
   // - les events réellement stockés pour ce profil à cette date
@@ -409,7 +408,7 @@ export default function CalendarEnhancedView({
                   className={`border rounded-xl p-4 cursor-pointer hover:shadow transition ${colorClass}`}
                 >
                   <div className="text-2xl mb-2">
-                    {ICONS[e.type] || "❓"}
+                    {ICONS[e.type] || "groupe"}
                   </div>
                   <h4 className="font-semibold text-gray-800 mb-1">
                     {e.title || "Sans titre"}
