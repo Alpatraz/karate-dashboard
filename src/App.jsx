@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Target,
   Calendar as CalendarIcon,
@@ -18,45 +18,59 @@ import InstructorsView from "./components/InstructorsView";
 import CalendarEnhancedView from "./components/CalendarEnhancedView";
 import AddEventModal from "./components/AddEventModal";
 import ProfileManager from "./components/ProfileManager";
+import PlanningEditor from "./components/PlanningEditor";
 
-const BELTS = [
-  "Blanche", "Jaune", "Orange", "Mauve", "Verte", "Verte / Bleue",
-  "Bleue", "Bleue / Brune", "Brune", "Brune / Noire",
-  "Noire", "Noire 1 Dan", "Noire 2 Dan", "Noire 3 Dan",
-];
-const beltIndex = (b) => BELTS.indexOf(b);
+// ==========================================================
+// Données globales communes
+// ==========================================================
 
 const DEFAULT_RULES = {
-  "Blanche→Jaune": 30, "Jaune→Orange": 40, "Orange→Mauve": 50,
-  "Mauve→Verte": 60, "Verte→Verte / Bleue": 70,
-  "Verte / Bleue→Bleue": 80, "Bleue→Brune": 100, "Brune→Noire": 120,
+  "Blanche→Jaune": 30,
+  "Jaune→Orange": 40,
+  "Orange→Mauve": 50,
+  "Mauve→Verte": 60,
+  "Verte→Verte / Bleue": 70,
+  "Verte / Bleue→Bleue": 80,
+  "Bleue→Brune": 100,
+  "Brune→Noire": 120,
 };
 
+// ton horaire régulier
 const DEFAULT_PLANNING = [
   {
     jour: "Lundi",
     cours: [
-      { nom: "Adultes Bleue et+", heure: "19h00-20h00", type: "Adulte" },
-      { nom: "Combat avancé", heure: "20h00-20h30", type: "Adulte" },
+      { nom: "Adultes Bleue et+", heure: "19h00-20h00", type: "groupe" },
+      { nom: "Combat avancé", heure: "20h00-20h30", type: "groupe" },
     ],
   },
   {
     jour: "Jeudi",
     cours: [
-      { nom: "Karaté Adultes", heure: "19h00-20h00", type: "Adulte" },
-      { nom: "Armes 12+", heure: "20h00-20h30", type: "Adulte" },
+      { nom: "Karaté Adultes", heure: "19h00-20h00", type: "groupe" },
+      { nom: "Armes 12+", heure: "20h00-20h30", type: "groupe" },
     ],
   },
   {
     jour: "Dimanche",
-    cours: [{ nom: "Pré-Ados/Adultes 8+", heure: "10h00-11h00", type: "Adulte" }],
+    cours: [
+      { nom: "Pré-Ados/Adultes 8+", heure: "10h00-11h00", type: "groupe" },
+    ],
   },
 ];
 
+// ==========================================================
+// Composant principal
+// ==========================================================
 export default function KarateDashboard() {
-  const [activeTab, setActiveTab] = useState("Tableau de bord");
+  // ---------------------------
+  // Onglet actif dans la barre latérale
+  // ---------------------------
+  const [activeTab, setActiveTab] = useState("Calendrier"); // <-- on ouvre direct sur Calendrier pour debug
 
-  // ---------------------- PROFILS ----------------------
+  // ---------------------------
+  // Profils
+  // ---------------------------
   const [profiles, setProfiles] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("karate_profiles") || "[]");
@@ -64,27 +78,37 @@ export default function KarateDashboard() {
       return [];
     }
   });
+
   const [activeProfile, setActiveProfile] = useState(null);
 
+  // Au premier render :
+  // - on seed les JSON initiaux si pas déjà faits
+  // - on crée un profil par défaut si aucun profil
   useEffect(() => {
+    // seed instructeurs (juste pour que ça existe dans localStorage)
     import("./data/instructors.json").then((mod) => {
       localStorage.setItem("karate_instructors", JSON.stringify(mod.default));
     });
-    import("./data/belts.json").then((mod) => {
-      localStorage.setItem("karate_belts_rules", JSON.stringify(mod.default));
-    });
-    import("./data/profile.json").then((mod) => {
-      localStorage.setItem("karate_profile", JSON.stringify(mod.default));
-    });
 
+    // seed règles
+    if (!localStorage.getItem("karate_rules")) {
+      localStorage.setItem("karate_rules", JSON.stringify(DEFAULT_RULES));
+    }
+
+    // seed planning
+    if (!localStorage.getItem("karate_planning")) {
+      localStorage.setItem("karate_planning", JSON.stringify(DEFAULT_PLANNING));
+    }
+
+    // si pas de profils -> créer un profil par défaut immédiatement
     if (!profiles || profiles.length === 0) {
       const defaultProfile = {
         id: "profile-1",
-        nom: "Profil Principal",
+        nom: "Guillaume",
         dateNaissance: "2000-01-01",
         type: "Adulte",
         abonnementMensuel: 0,
-        options: { armes: false, combat: false },
+        options: { armes: true, combat: true },
         actif: true,
       };
       const initialProfiles = [defaultProfile];
@@ -95,55 +119,53 @@ export default function KarateDashboard() {
       const current = profiles.find((p) => p.actif) || profiles[0];
       setActiveProfile(current || null);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // sync profils => localStorage
   useEffect(() => {
     localStorage.setItem("karate_profiles", JSON.stringify(profiles));
   }, [profiles]);
 
-  // ---------------------- EVENTS ----------------------
-  const [events, setEvents] = useState([]);
-  useEffect(() => {
-    if (!activeProfile) return;
-    const key = `karate_events_${activeProfile.id}`;
-    const stored = JSON.parse(localStorage.getItem(key) || "[]");
-    setEvents(stored);
-  }, [activeProfile]);
-  useEffect(() => {
-    if (!activeProfile) return;
-    const key = `karate_events_${activeProfile.id}`;
-    localStorage.setItem(key, JSON.stringify(events));
-  }, [events, activeProfile]);
-
-  // ---------------------- BELTS PAR PROFIL ----------------------
-  const [belts, setBelts] = useState([]);
-  useEffect(() => {
-    if (!activeProfile) return;
-    const key = `karate_belts_${activeProfile.id}`;
-    const stored = JSON.parse(localStorage.getItem(key) || "[]");
-    setBelts(stored);
-  }, [activeProfile]);
-  useEffect(() => {
-    if (!activeProfile) return;
-    const key = `karate_belts_${activeProfile.id}`;
-    localStorage.setItem(key, JSON.stringify(belts));
-  }, [belts, activeProfile]);
-
-  // ---------------------- PARAMÈTRES COMMUNS ----------------------
-  const [rules, setRules] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("karate_rules") || JSON.stringify(DEFAULT_RULES));
-    } catch {
-      return DEFAULT_RULES;
-    }
-  });
+  // ---------------------------
+  // planning commun (horaire régulier)
+  // ---------------------------
   const [planning, setPlanning] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("karate_planning") || JSON.stringify(DEFAULT_PLANNING));
+      return JSON.parse(
+        localStorage.getItem("karate_planning") ||
+          JSON.stringify(DEFAULT_PLANNING)
+      );
     } catch {
       return DEFAULT_PLANNING;
     }
   });
+
+  useEffect(() => {
+    localStorage.setItem("karate_planning", JSON.stringify(planning));
+  }, [planning]);
+
+  // ---------------------------
+  // règles communes
+  // ---------------------------
+  const [rules, setRules] = useState(() => {
+    try {
+      return JSON.parse(
+        localStorage.getItem("karate_rules") ||
+          JSON.stringify(DEFAULT_RULES)
+      );
+    } catch {
+      return DEFAULT_RULES;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("karate_rules", JSON.stringify(rules));
+  }, [rules]);
+
+  // ---------------------------
+  // jours fermés (commun pour tous, pas encore utilisé fort)
+  // ---------------------------
   const [holidays, setHolidays] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("karate_holidays") || "[]");
@@ -151,27 +173,104 @@ export default function KarateDashboard() {
       return [];
     }
   });
+  useEffect(() => {
+    localStorage.setItem("karate_holidays", JSON.stringify(holidays));
+  }, [holidays]);
 
-  useEffect(() => localStorage.setItem("karate_rules", JSON.stringify(rules)), [rules]);
-  useEffect(() => localStorage.setItem("karate_planning", JSON.stringify(planning)), [planning]);
-  useEffect(() => localStorage.setItem("karate_holidays", JSON.stringify(holidays)), [holidays]);
+  // ---------------------------
+  // Ceintures (PAR PROFIL maintenant)
+  //
+  // on stocke chaque profil dans sa propre clé: karate_belts_<id>
+  // ---------------------------
+  const [beltsByProfile, setBeltsByProfile] = useState({}); // { [profileId]: [...] }
 
-  // ---------------------- MODALE D’AJOUT ----------------------
-  const [showAdd, setShowAdd] = useState(false);
-  const handleAddEvent = (ev) => {
+  // charger belts du profil actif
+  useEffect(() => {
     if (!activeProfile) return;
-    const full = { ...ev, profileId: activeProfile.id, status: "planifié" };
-    setEvents((prev) => [...prev, full]);
+    const k = `karate_belts_${activeProfile.id}`;
+    const arr = JSON.parse(localStorage.getItem(k) || "[]");
+    setBeltsByProfile((prev) => ({ ...prev, [activeProfile.id]: arr }));
+  }, [activeProfile]);
+
+  // fonction pour mettre à jour les ceintures d'un profil donné
+  const setBeltsForActiveProfile = (newBelts) => {
+    if (!activeProfile) return;
+    const profileId = activeProfile.id;
+    const key = `karate_belts_${profileId}`;
+    localStorage.setItem(key, JSON.stringify(newBelts));
+    setBeltsByProfile((prev) => ({
+      ...prev,
+      [profileId]: newBelts,
+    }));
   };
 
-  // ---------------------- CHANGEMENT DE PROFIL ----------------------
+  // ---------------------------
+  // EVENTS (PAR PROFIL)
+  // ---------------------------
+  const [eventsByProfile, setEventsByProfile] = useState({}); // { [profileId]: [...] }
+
+  // charger events quand le profil actif change
+  useEffect(() => {
+    if (!activeProfile) return;
+    const key = `karate_events_${activeProfile.id}`;
+    const stored = JSON.parse(localStorage.getItem(key) || "[]");
+    setEventsByProfile((prev) => ({ ...prev, [activeProfile.id]: stored }));
+  }, [activeProfile]);
+
+  // helper pour récupérer les events pour le profil actif sans se planter
+  const activeEvents = activeProfile
+    ? eventsByProfile[activeProfile.id] || []
+    : [];
+
+  // quand on modifie les events -> push dans localStorage + state global
+  const setEventsForActiveProfile = (updaterFnOrArray) => {
+    if (!activeProfile) return;
+    const profId = activeProfile.id;
+    const prev = eventsByProfile[profId] || [];
+    const next =
+      typeof updaterFnOrArray === "function"
+        ? updaterFnOrArray(prev)
+        : updaterFnOrArray;
+
+    // save
+    localStorage.setItem(`karate_events_${profId}`, JSON.stringify(next));
+
+    // update state
+    setEventsByProfile((all) => ({
+      ...all,
+      [profId]: next,
+    }));
+  };
+
+  // ---------------------------
+  // Popup "Ajouter événement"
+  // ---------------------------
+  const [showAdd, setShowAdd] = useState(false);
+
+  const handleAddEvent = (ev) => {
+    if (!activeProfile) return;
+    const full = {
+      ...ev,
+      profileId: activeProfile.id,
+      status: "planifié",
+    };
+    setEventsForActiveProfile((prev) => [...prev, full]);
+  };
+
+  // ---------------------------
+  // Changer le profil actif depuis l'onglet Profils
+  // ---------------------------
   const handleSetActiveProfile = (id) => {
-    setProfiles((prev) => prev.map((p) => ({ ...p, actif: p.id === id })));
+    setProfiles((prev) =>
+      prev.map((p) => ({ ...p, actif: p.id === id }))
+    );
     const newActive = profiles.find((p) => p.id === id);
     setActiveProfile(newActive || null);
   };
 
-  // ---------------------- MENU ----------------------
+  // ---------------------------
+  // Sidebar menu
+  // ---------------------------
   const menu = [
     { label: "Tableau de bord", icon: <Target /> },
     { label: "Calendrier", icon: <CalendarIcon /> },
@@ -184,20 +283,29 @@ export default function KarateDashboard() {
     { label: "Paramètres", icon: <SettingsIcon /> },
   ];
 
-  // ---------------------- RENDER ----------------------
+  // ---------------------------
+  // Render
+  // ---------------------------
   return (
     <div className="min-h-screen bg-gray-50 flex">
+      {/* Barre latérale */}
       <aside className="w-72 bg-white border-r p-4">
-        <h1 className="text-xl font-bold text-red-600 mb-6">🥋 Progression Karaté</h1>
+        <h1 className="text-xl font-bold text-red-600 mb-6">
+          🥋 Progression Karaté
+        </h1>
 
+        {/* Profil actif résumé */}
         {activeProfile ? (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
             <div className="font-semibold flex justify-between items-center">
               <span>{activeProfile.nom}</span>
-              <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded">actif</span>
+              <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded">
+                actif
+              </span>
             </div>
             <div className="text-red-800 text-xs mt-1">
-              {activeProfile.type} · Abonnement {activeProfile.abonnementMensuel ?? 0}$
+              {activeProfile.type} · Abonnement{" "}
+              {activeProfile.abonnementMensuel ?? 0}$
             </div>
           </div>
         ) : (
@@ -212,7 +320,9 @@ export default function KarateDashboard() {
               key={m.label}
               onClick={() => setActiveTab(m.label)}
               className={`flex items-center gap-2 w-full p-2 rounded-md ${
-                activeTab === m.label ? "bg-red-50 text-red-600" : "hover:bg-gray-100"
+                activeTab === m.label
+                  ? "bg-red-50 text-red-600"
+                  : "hover:bg-gray-100"
               }`}
             >
               {m.icon}
@@ -222,32 +332,48 @@ export default function KarateDashboard() {
         </nav>
       </aside>
 
+      {/* Zone principale */}
       <main className="flex-1 p-6 overflow-y-auto">
         {activeTab === "Tableau de bord" && (
-          <DashboardView events={events} activeProfile={activeProfile} belts={belts} />
+          <DashboardView
+            events={activeEvents}
+            activeProfile={activeProfile}
+            belts={beltsByProfile[activeProfile?.id] || []}
+            rules={rules}
+          />
         )}
+
         {activeTab === "Calendrier" && (
           <CalendarEnhancedView
-            events={events}
-            setEvents={setEvents}
+            events={activeEvents}
+            setEvents={setEventsForActiveProfile}
             showAdd={showAdd}
             setShowAdd={setShowAdd}
             handleAddEvent={handleAddEvent}
             activeProfile={activeProfile}
+            planning={planning}
           />
         )}
+
+        {activeTab === "Base technique" && (
+          <div>Base technique (à venir)</div>
+        )}
+
         {activeTab === "Progression" && (
           <ProgressionView
-            events={events}
+            events={activeEvents}
             rules={rules}
-            belts={belts}
-            setBelts={setBelts}
-            activeProfile={activeProfile}
+            belts={beltsByProfile[activeProfile?.id] || []}
+            setBelts={(newArr) => setBeltsForActiveProfile(newArr)}
           />
         )}
+
         {activeTab === "Vidéos" && <VideoLibraryView />}
+
         {activeTab === "Instructeurs" && <InstructorsView />}
+
         {activeTab === "Santé" && <div>Santé (à venir)</div>}
+
         {activeTab === "Profils" && (
           <ProfileManager
             profiles={profiles}
@@ -256,15 +382,38 @@ export default function KarateDashboard() {
             onSetActiveProfile={handleSetActiveProfile}
           />
         )}
-        {activeTab === "Paramètres" && (
-          <div className="text-gray-700">
-            <h2 className="text-2xl font-bold mb-4">Paramètres</h2>
-            <p>Ici tu pourras gérer planning, jours fermés, règles de passage, etc.</p>
-          </div>
-        )}
+
+{activeTab === "Paramètres" && (
+  <div className="text-gray-700 space-y-6">
+    <div>
+      <h2 className="text-2xl font-bold mb-2 text-red-600">
+        Paramètres globaux
+      </h2>
+      <p className="text-sm text-gray-600">
+        Gère ici l’horaire régulier, les jours fermés et les règles.
+      </p>
+    </div>
+
+    <div className="bg-gray-50 border rounded-lg p-4">
+      <h3 className="font-semibold text-gray-800 mb-3">
+        Horaire régulier (planning)
+      </h3>
+
+      <PlanningEditor planning={planning} setPlanning={setPlanning} />
+    </div>
+  </div>
+)}
+
+
       </main>
 
-      <AddEventModal show={showAdd} onClose={() => setShowAdd(false)} onAdd={handleAddEvent} activeProfile={activeProfile} />
+      {/* Modale globale d'ajout d'événement */}
+      <AddEventModal
+        show={showAdd}
+        onClose={() => setShowAdd(false)}
+        onAdd={handleAddEvent}
+        activeProfile={activeProfile}
+      />
     </div>
   );
 }

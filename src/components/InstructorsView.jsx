@@ -126,6 +126,23 @@ export default function InstructorsView() {
                     }
                   />
                 </div>
+                <div className="w-32">
+  <label className="block text-xs text-gray-500 mb-1">
+    Tarif semi-privé ($)
+  </label>
+  <input
+    type="number"
+    className="border rounded p-2 w-full text-sm"
+    value={inst.tarif_semi_prive || 0}
+    onChange={(e) =>
+      updateInstructor(
+        inst.id,
+        "tarif_semi_prive",
+        parseFloat(e.target.value) || 0
+      )
+    }
+  />
+</div>
 
                 <div className="w-24">
                   <label className="block text-xs text-gray-500 mb-1">

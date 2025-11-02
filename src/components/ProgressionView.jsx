@@ -1,23 +1,17 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
+// ordre des ceintures pour trier/comparer
 const BELTS = [
-  "Blanche",
-  "Jaune",
-  "Orange",
-  "Mauve",
-  "Verte",
-  "Verte / Bleue",
-  "Bleue",
-  "Bleue / Brune",
-  "Brune",
-  "Brune / Noire",
-  "Noire",
-  "Noire 1 Dan",
-  "Noire 2 Dan",
-  "Noire 3 Dan",
+  "Blanche", "Jaune", "Orange", "Mauve", "Verte", "Verte / Bleue",
+  "Bleue", "Bleue / Brune", "Brune", "Brune / Noire",
+  "Noire", "Noire 1 Dan", "Noire 2 Dan", "Noire 3 Dan",
 ];
 
-// util petit format date locale sans décalage fuseau
+function beltIndex(b) {
+  return BELTS.indexOf(b);
+}
+
+// petite util pour format local sans décalage fuseau
 function fmt(dateString) {
   if (!dateString) return "";
   const [y, m, d] = dateString.split("-");
@@ -30,165 +24,58 @@ function fmt(dateString) {
 }
 
 export default function ProgressionView({
-  events,
-  rules,
-  belts,
-  setBelts,
+  events = [],
+  rules = {},
+  belts = [],
+  setBelts = () => {},
   activeProfile,
 }) {
-  // ------------------------------------------------
-  // FORMULAIRE "Ajouter un passage"
-  // ------------------------------------------------
+  // 🔒 sécurité : jamais undefined
+  if (!Array.isArray(events)) events = [];
+  if (!Array.isArray(belts)) belts = [];
+  if (typeof rules !== "object" || rules === null) rules = {};
+
+  // formulaire "Ajouter un passage"
   const [form, setForm] = useState({
     couleur: "Blanche",
     date: "",
     feeling: "",
-    invite: false, // false = vraie ceinture obtenue, true = juste invitation
+    invite: false,
   });
 
-  // ------------------------------------------------
-  // AU CHANGEMENT DE PROFIL ACTIF :
-  // charger ses ceintures depuis localStorage
-  // ------------------------------------------------
-  useEffect(() => {
-    if (!activeProfile) return;
-    const key = `karate_belts_${activeProfile.id}`;
-    try {
-      const stored = JSON.parse(localStorage.getItem(key) || "[]");
-      // petite migration de sécurité : si TOUT est "invite":true,
-      // on force la dernière entrée à devenir une vraie ceinture passée
-      if (
-        stored.length > 0 &&
-        stored.every((b) => b.invite === true)
-      ) {
-        stored[stored.length - 1].invite = false;
-        localStorage.setItem(key, JSON.stringify(stored));
-      }
-
-      setBelts(stored);
-    } catch {
-      setBelts([]);
-    }
-  }, [activeProfile, setBelts]);
-
-  // ------------------------------------------------
-  // SAUVEGARDE AUTO des ceintures du profil actif
-  // ------------------------------------------------
-  useEffect(() => {
-    if (!activeProfile) return;
-    const key = `karate_belts_${activeProfile.id}`;
-    localStorage.setItem(key, JSON.stringify(belts));
-  }, [belts, activeProfile]);
-
-  // ------------------------------------------------
-  // 1. Déterminer la ceinture actuelle (dernière NON invite)
-  // ------------------------------------------------
+  // --------------------------
+  // 1. Ceinture actuelle
+  // --------------------------
   const realBelts = belts.filter((b) => !b.invite);
-  const currentBelt = realBelts.length
-    ? realBelts[realBelts.length - 1]
-    : null;
+  const currentBelt = realBelts.length ? realBelts[realBelts.length - 1] : null;
 
-  // depuis quelle date on compte les points ?
   const sinceDate = currentBelt?.date || null;
-
-  // ------------------------------------------------
-  // 2. Calculer les points depuis la dernière vraie ceinture
-  //    (uniquement pour CE profil et uniquement les "fait")
-  // ------------------------------------------------
   const done = events.filter(
-    (e) =>
-      e.profileId === activeProfile?.id &&
-      e.status === "fait" &&
-      (!sinceDate || e.date >= sinceDate)
+    (e) => e.status === "fait" && (!sinceDate || e.date >= sinceDate)
   );
 
   const groupPts = done.filter((e) => e.type === "groupe").length;
-  const privatePts =
-    done.filter((e) => e.type === "privé").length * 4;
+  const privatePts = done.filter((e) => e.type === "privé").length * 4;
   const totalPts = groupPts + privatePts;
 
-  // règle associée : ex "Verte / Bleue→Bleue": 80
-  const ruleEntry = currentBelt
-    ? Object.entries(rules).find(([transition]) =>
+  // règle associée à la ceinture actuelle
+  let ruleEntry = null;
+  try {
+    if (currentBelt && typeof rules === "object") {
+      ruleEntry = Object.entries(rules).find(([transition]) =>
         transition.startsWith(currentBelt.couleur)
-      )
-    : null;
+      );
+    }
+  } catch (err) {
+    console.warn("Erreur lecture règles de progression :", err);
+  }
 
   const requiredPts = ruleEntry ? ruleEntry[1] : 0;
-  const restants = requiredPts
-    ? Math.max(requiredPts - totalPts, 0)
-    : 0;
+  const restants = requiredPts ? Math.max(requiredPts - totalPts, 0) : 0;
 
-  // ------------------------------------------------
-  // 3. Gestion de l'INVITATION à la prochaine ceinture
-  //    C'est une entrée belts[] avec invite:true
-  // ------------------------------------------------
-  const pendingInviteIndex = belts.findLastIndex(
-    (b) => b.invite === true
-  );
-  const pendingInvite =
-    pendingInviteIndex >= 0 ? belts[pendingInviteIndex] : null;
-
-  function updateInviteCheckbox(checked) {
-    // on modifie le tableau belts
-    const arr = [...belts];
-
-    if (!checked) {
-      // si on décoche → on supprime l'invitation
-      if (pendingInviteIndex >= 0) {
-        arr.splice(pendingInviteIndex, 1);
-      }
-    } else {
-      // si on coche → on crée une nouvelle invitation si pas déjà présente
-      if (!pendingInvite) {
-        // prochaine couleur logique d'après la règle
-        let nextColor = "";
-        if (ruleEntry) {
-          const transition = ruleEntry[0]; // ex "Verte / Bleue→Bleue"
-          nextColor = transition.split("→")[1];
-        }
-        arr.push({
-          couleur: nextColor || "???",
-          date: "", // pas encore fixée
-          feeling: "",
-          invite: true,
-        });
-      }
-    }
-
-    setBelts(arr);
-
-    if (activeProfile) {
-      localStorage.setItem(
-        `karate_belts_${activeProfile.id}`,
-        JSON.stringify(arr)
-      );
-    }
-  }
-
-  function updateInviteDate(newDate) {
-    if (pendingInviteIndex < 0) return;
-    const arr = [...belts];
-
-    arr[pendingInviteIndex] = {
-      ...arr[pendingInviteIndex],
-      date: newDate,
-    };
-
-    setBelts(arr);
-
-    if (activeProfile) {
-      localStorage.setItem(
-        `karate_belts_${activeProfile.id}`,
-        JSON.stringify(arr)
-      );
-    }
-  }
-
-  // ------------------------------------------------
-  // 4. Ajouter un PASSAGE de ceinture (ou une INVITATION)
-  //    bouton "Ajouter"
-  // ------------------------------------------------
+  // --------------------------
+  // 2. Ajout de passage
+  // --------------------------
   function addPass() {
     if (!form.date || !form.couleur) return;
 
@@ -196,20 +83,14 @@ export default function ProgressionView({
       couleur: form.couleur,
       date: form.date,
       feeling: form.feeling,
-      invite: form.invite, // true = juste invitation reçue, false = vraie ceinture obtenue
+      invite: form.invite,
+      profileId: activeProfile?.id || "default",
     };
 
     const updated = [...belts, newEntry];
     setBelts(updated);
+    localStorage.setItem("karate_belts", JSON.stringify(updated));
 
-    if (activeProfile) {
-      localStorage.setItem(
-        `karate_belts_${activeProfile.id}`,
-        JSON.stringify(updated)
-      );
-    }
-
-    // reset formulaire
     setForm({
       couleur: "Blanche",
       date: "",
@@ -218,28 +99,61 @@ export default function ProgressionView({
     });
   }
 
-  // ------------------------------------------------
-  // RENDER
-  // ------------------------------------------------
+  // --------------------------
+  // 3. Gestion des invitations
+  // --------------------------
+  const pendingInviteIndex = belts.findLastIndex((b) => b.invite === true);
+  const pendingInvite =
+    pendingInviteIndex >= 0 ? belts[pendingInviteIndex] : null;
 
-  if (!activeProfile) {
-    return (
-      <div className="text-gray-500 p-6">
-        Aucun profil actif sélectionné.
-      </div>
-    );
+  function updateInviteCheckbox(checked) {
+    const arr = [...belts];
+
+    if (!checked) {
+      if (pendingInviteIndex >= 0) arr.splice(pendingInviteIndex, 1);
+    } else {
+      if (!pendingInvite) {
+        let nextColor = "";
+        if (ruleEntry) {
+          const transition = ruleEntry[0];
+          nextColor = transition.split("→")[1];
+        }
+        arr.push({
+          couleur: nextColor || "???",
+          date: "",
+          feeling: "",
+          invite: true,
+          profileId: activeProfile?.id || "default",
+        });
+      }
+    }
+
+    setBelts(arr);
+    localStorage.setItem("karate_belts", JSON.stringify(arr));
   }
 
+  function updateInviteDate(newDate) {
+    if (pendingInviteIndex < 0) return;
+    const arr = [...belts];
+    arr[pendingInviteIndex] = {
+      ...arr[pendingInviteIndex],
+      date: newDate,
+    };
+    setBelts(arr);
+    localStorage.setItem("karate_belts", JSON.stringify(arr));
+  }
+
+  // --------------------------
+  // RENDER
+  // --------------------------
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4 text-red-600">
-        Progression des ceintures – {activeProfile.nom}
+        Progression des ceintures
       </h2>
 
       <div className="grid md:grid-cols-2 gap-4 mb-6">
-        {/* =====================
-            Bloc Ceinture actuelle
-        ======================*/}
+        {/* ---- CEINTURE ACTUELLE ---- */}
         <div className="bg-white border rounded p-4">
           <h3 className="font-semibold mb-2 text-gray-800">
             Ceinture actuelle
@@ -268,14 +182,12 @@ export default function ProgressionView({
             ) : null}
           </p>
 
-          {/* --- Gestion Invitation prochaine ceinture --- */}
+          {/* --- INVITATION CEINTURE SUIVANTE --- */}
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-gray-800">
             <input
               type="checkbox"
               checked={!!pendingInvite}
-              onChange={(e) =>
-                updateInviteCheckbox(e.target.checked)
-              }
+              onChange={(e) => updateInviteCheckbox(e.target.checked)}
             />
             <span>Invitation reçue ?</span>
 
@@ -284,17 +196,13 @@ export default function ProgressionView({
                 type="date"
                 className="border rounded p-1 text-sm"
                 value={pendingInvite.date || ""}
-                onChange={(e) =>
-                  updateInviteDate(e.target.value)
-                }
+                onChange={(e) => updateInviteDate(e.target.value)}
               />
             )}
           </div>
         </div>
 
-        {/* =====================
-            Bloc Ajout passage / invitation
-        ======================*/}
+        {/* ---- AJOUT D'UNE CEINTURE ---- */}
         <div className="bg-white border rounded p-4">
           <h3 className="font-semibold mb-2 text-gray-800">
             Ajouter un passage
@@ -304,9 +212,7 @@ export default function ProgressionView({
             <select
               className="border rounded p-2 text-gray-800"
               value={form.couleur}
-              onChange={(e) =>
-                setForm({ ...form, couleur: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, couleur: e.target.value })}
             >
               {BELTS.map((b) => (
                 <option key={b}>{b}</option>
@@ -317,18 +223,14 @@ export default function ProgressionView({
               className="border rounded p-2 text-gray-800"
               type="date"
               value={form.date}
-              onChange={(e) =>
-                setForm({ ...form, date: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
             />
 
             <input
               className="border rounded p-2 text-gray-800"
               placeholder="Feeling / commentaire"
               value={form.feeling}
-              onChange={(e) =>
-                setForm({ ...form, feeling: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, feeling: e.target.value })}
             />
 
             <label className="flex items-center gap-2 text-sm text-gray-700 mt-1">
@@ -336,10 +238,7 @@ export default function ProgressionView({
                 type="checkbox"
                 checked={form.invite}
                 onChange={(e) =>
-                  setForm({
-                    ...form,
-                    invite: e.target.checked,
-                  })
+                  setForm({ ...form, invite: e.target.checked })
                 }
               />
               <span>C’est une invitation ?</span>
@@ -355,25 +254,16 @@ export default function ProgressionView({
         </div>
       </div>
 
-      {/* =====================
-          Historique
-      ======================*/}
+      {/* ---- HISTORIQUE ---- */}
       <div className="bg-white border rounded p-4">
-        <h3 className="font-semibold mb-2 text-gray-800">
-          Historique
-        </h3>
+        <h3 className="font-semibold mb-2 text-gray-800">Historique</h3>
 
         {belts.length === 0 && (
-          <p className="text-gray-500">
-            Aucun passage enregistré.
-          </p>
+          <p className="text-gray-500">Aucun passage enregistré.</p>
         )}
 
         {belts.map((b, i) => (
-          <div
-            key={i}
-            className="py-2 border-b text-gray-800"
-          >
+          <div key={i} className="py-2 border-b text-gray-800">
             <p>
               <b>{b.couleur}</b> — {fmt(b.date)}{" "}
               {b.invite && (
@@ -383,9 +273,7 @@ export default function ProgressionView({
               )}
             </p>
             {b.feeling && (
-              <p className="text-sm text-gray-600 italic">
-                {b.feeling}
-              </p>
+              <p className="text-sm text-gray-600 italic">{b.feeling}</p>
             )}
           </div>
         ))}
