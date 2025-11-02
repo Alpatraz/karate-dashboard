@@ -1,0 +1,5 @@
+[
+    { "id": "inst01", "nom": "Sensei Kenji", "niveau": "Ceinture noire 3e dan", "specialite": "Kata, Armes", "cout_prive": 60, "cout_semi_prive": 40 },
+    { "id": "inst02", "nom": "Sensei Marie", "niveau": "Ceinture noire 2e dan", "specialite": "Combat, Kenpo", "cout_prive": 55, "cout_semi_prive": 35 }
+  ]
+  

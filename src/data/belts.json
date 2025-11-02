@@ -1,0 +1,14 @@
+[
+    { "couleur": "Blanche", "cout": 0, "requis": 0 },
+    { "couleur": "Jaune", "cout": 45, "requis": 30 },
+    { "couleur": "Orange", "cout": 50, "requis": 40 },
+    { "couleur": "Mauve", "cout": 50, "requis": 40 },
+    { "couleur": "Verte", "cout": 50, "requis": 40 },
+    { "couleur": "Verte / Bleue", "cout": 60, "requis": 50 },
+    { "couleur": "Bleue", "cout": 75, "requis": 60 },
+    { "couleur": "Bleue / Brune", "cout": 50, "requis": 40 },
+    { "couleur": "Brune", "cout": 75, "requis": 60 },
+    { "couleur": "Brune / Noire", "cout": 50, "requis": 40 },
+    { "couleur": "Noire", "cout": 75, "requis": 60 }
+  ]
+  

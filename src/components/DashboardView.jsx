@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Target, Trophy } from "lucide-react";
+import { Target, Trophy, Calendar } from "lucide-react";
 
-// util date courte
+// === utilitaires ===
 function fmtDay(d) {
   if (!d) return "—";
   const [y, m, dd] = d.split("-");
@@ -13,7 +13,6 @@ function fmtDay(d) {
   });
 }
 
-// util mois+année
 function fmtMonthYear(dateObj) {
   if (!dateObj) return "—";
   return dateObj.toLocaleDateString("fr-CA", {
@@ -22,13 +21,11 @@ function fmtMonthYear(dateObj) {
   });
 }
 
-// retrouve la dernière ceinture réelle (invite=false)
 function getCurrentBelt(belts) {
   const realBelts = belts.filter((b) => !b.invite);
   return realBelts.length ? realBelts[realBelts.length - 1] : null;
 }
 
-// retrouve l'invitation en attente (invite=true, la plus récente)
 function getPendingInvite(belts) {
   for (let i = belts.length - 1; i >= 0; i--) {
     if (belts[i].invite) return belts[i];
@@ -36,66 +33,60 @@ function getPendingInvite(belts) {
   return null;
 }
 
-export default function DashboardView() {
-  const [events, setEvents] = useState([]);
+// === composant principal ===
+export default function DashboardView({ activeProfile, events = [], belts = [] }) {
   const [rules, setRules] = useState({});
-  const [belts, setBelts] = useState([]);
+  const [annee, setAnnee] = useState(new Date().getFullYear());
 
+  // Chargement des règles globales une fois
   useEffect(() => {
-    setEvents(JSON.parse(localStorage.getItem("karate_events") || "[]"));
     setRules(JSON.parse(localStorage.getItem("karate_rules") || "{}"));
-    setBelts(JSON.parse(localStorage.getItem("karate_belts") || "[]"));
   }, []);
 
-  // données utiles ceinture actuelle
+  // Ceinture actuelle et progression
   const currentBelt = getCurrentBelt(belts);
   const currentBeltColor = currentBelt?.couleur || "Blanche";
   const currentBeltDate = currentBelt?.date || null;
 
-  // date de début pour compter les cours faits
   const sinceDate = currentBeltDate || null;
-
-  // cours faits depuis cette ceinture
   const doneEventsSince = events.filter(
-    (e) => e.status === "fait" && (!sinceDate || e.date >= sinceDate)
+    (e) =>
+      e.profileId === activeProfile?.id &&
+      e.status === "fait" &&
+      (!sinceDate || e.date >= sinceDate)
   );
 
   const groupCount = doneEventsSince.filter((e) => e.type === "groupe").length;
-  const privateCount =
-    doneEventsSince.filter((e) => e.type === "privé").length * 4;
-  const totalDone = groupCount + privateCount;
+  const privateCount = doneEventsSince.filter((e) => e.type === "privé").length;
+  const weaponCombatCount = doneEventsSince.filter(
+    (e) =>
+      e.type === "arme" ||
+      e.title?.toLowerCase().includes("combat") ||
+      e.title?.toLowerCase().includes("arme")
+  ).length;
+  const totalDone = groupCount + privateCount * 4;
 
-  // règle de progression à partir de la ceinture actuelle
   const progressionRuleEntry = currentBelt
     ? Object.entries(rules).find(([transition]) =>
         transition.startsWith(currentBelt.couleur)
       )
     : null;
 
-  // la "prochaine ceinture prévue"
-  // cas 1 : on a une invitation officielle => on affiche cette ceinture + "Date réelle"
-  // cas 2 : pas d'invite => on lit la couleur dans la règle "X→Y"
   const invite = getPendingInvite(belts);
-
   let nextBeltColor = null;
-  if (invite) {
-    nextBeltColor = invite.couleur; // ex. "Bleue"
-  } else if (progressionRuleEntry) {
-    nextBeltColor = progressionRuleEntry[0].split("→")[1]; // ex "Verte / Bleue→Bleue"
-  }
+  if (invite) nextBeltColor = invite.couleur;
+  else if (progressionRuleEntry)
+    nextBeltColor = progressionRuleEntry[0].split("→")[1];
 
-  // requis total pour atteindre la prochaine ceinture
   const requiredForNext = progressionRuleEntry
     ? progressionRuleEntry[1]
     : totalDone;
   const remaining = Math.max(requiredForNext - totalDone, 0);
-
-  // % progression
   const progressPct = requiredForNext
     ? Math.min((totalDone / requiredForNext) * 100, 100)
     : 100;
 
-  // vitesse hebdo (8 dernières semaines glissantes)
+  // Estimation date prochaine ceinture
   const now = new Date();
   const eightWeeksAgo = new Date();
   eightWeeksAgo.setDate(now.getDate() - 56);
@@ -114,7 +105,6 @@ export default function DashboardView() {
   const weeklyRateRaw = doneLast8WeeksPoints / 8;
   const weeklyRate = weeklyRateRaw > 0 ? weeklyRateRaw : 1;
 
-  // estimation temps restant si pas encore invitation officielle
   const weeksRemaining =
     !invite && remaining > 0
       ? Math.ceil(remaining / weeklyRate)
@@ -123,40 +113,60 @@ export default function DashboardView() {
   const estimatedDateObj = new Date();
   estimatedDateObj.setDate(now.getDate() + weeksRemaining * 7);
 
-  // message/date à afficher dans la carte verte
-  const nextBeltDateLabel = invite
-    ? "Date réelle"
-    : "Date estimée";
-
+  const nextBeltDateLabel = invite ? "Date réelle" : "Date estimée";
   const nextBeltDateText = invite
     ? fmtMonthYear(new Date(invite.date + "T12:00:00"))
     : fmtMonthYear(estimatedDateObj);
-
-  // objectifs texte
   const objectifTxt = currentBeltColor + " → " + (nextBeltColor || "—");
 
-  // prochains entraînements
+  // Stats annuelles
+  const yearlyEvents = events.filter(
+    (e) =>
+      e.profileId === activeProfile?.id &&
+      e.status === "fait" &&
+      e.date.startsWith(annee.toString())
+  );
+
+  const yearlyStats = {
+    groupe: yearlyEvents.filter((e) => e.type === "groupe").length,
+    prive: yearlyEvents.filter((e) => e.type === "privé").length,
+    armes: yearlyEvents.filter((e) =>
+      e.title?.toLowerCase().includes("arme")
+    ).length,
+    combat: yearlyEvents.filter((e) =>
+      e.title?.toLowerCase().includes("combat")
+    ).length,
+    competition: yearlyEvents.filter((e) => e.type === "competition").length,
+  };
+
   const todayISO = new Date().toISOString().split("T")[0];
   const upcoming = useMemo(() => {
     return events
-      .filter((e) => e.date >= todayISO)
+      .filter(
+        (e) =>
+          e.profileId === activeProfile?.id &&
+          e.date >= todayISO
+      )
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 3);
-  }, [events, todayISO]);
+  }, [events, todayISO, activeProfile]);
 
-  // style visuel de la carte "prochaine ceinture"
-  const cardBg = "bg-green-100";
-  const cardText = "text-gray-800";
+  if (!activeProfile)
+    return (
+      <div className="p-6 text-gray-500">
+        Aucun profil actif sélectionné.
+      </div>
+    );
 
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">
-        Tableau de bord principal
+        Tableau de bord – {activeProfile.nom}
       </h1>
 
       {/* LIGNE DE CARTES */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        {/* Carte Ceinture actuelle */}
+        {/* Ceinture actuelle */}
         <div className="bg-white shadow rounded-xl p-5 border border-gray-100">
           <div className="flex items-center gap-3 mb-2">
             <Target className="text-red-600" size={24} />
@@ -172,7 +182,7 @@ export default function DashboardView() {
           </p>
         </div>
 
-        {/* Carte Cours faits / requis */}
+        {/* Cours faits / requis */}
         <div className="bg-white shadow rounded-xl p-5 border border-gray-100">
           <div className="flex items-center gap-3 mb-2">
             <Trophy className="text-red-600" size={24} />
@@ -184,15 +194,26 @@ export default function DashboardView() {
             {totalDone}
             {requiredForNext ? <> / {requiredForNext}</> : null}
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mb-3">
             Depuis la dernière ceinture
           </p>
+          <ul className="text-sm text-gray-700 leading-snug">
+            <li>🥋 Cours groupe : {groupCount}</li>
+            <li>
+              💪 Armes / Combat : {weaponCombatCount}{" "}
+              <span className="text-xs text-gray-500">(non comptés)</span>
+            </li>
+            <li>
+              🤝 Cours privés : {privateCount}{" "}
+              <span className="text-xs text-gray-500">
+                (équiv. {privateCount * 4} cours)
+              </span>
+            </li>
+          </ul>
         </div>
 
-        {/* Carte Prochaine ceinture */}
-        <div
-          className={`shadow rounded-xl p-5 border border-gray-200 ${cardBg} ${cardText} transition-colors`}
-        >
+        {/* Prochaine ceinture */}
+        <div className="bg-green-100 shadow rounded-xl p-5 border border-gray-200">
           <div className="flex items-start gap-3 mb-2">
             <div className="text-2xl leading-none">🥋</div>
             <div>
@@ -200,16 +221,12 @@ export default function DashboardView() {
                 Prochaine ceinture prévue
               </h2>
               <p className="text-xl font-bold text-gray-900">
-                {nextBeltColor || "—"}{" "}
-                {nextBeltDateText ? `– ${nextBeltDateText}` : ""}
+                {nextBeltColor || "—"} – {nextBeltDateText}
               </p>
-              <p className="text-sm text-gray-600">
-                {nextBeltDateLabel}
-              </p>
+              <p className="text-sm text-gray-600">{nextBeltDateLabel}</p>
             </div>
           </div>
 
-          {/* Barre de progression */}
           {!invite && (
             <div className="w-full bg-gray-200 h-2 rounded mt-3">
               <div
@@ -221,13 +238,10 @@ export default function DashboardView() {
 
           <div className="text-sm text-gray-700 mt-3 leading-snug">
             <p>
-              <b>{totalDone}</b> cours faits,
-              <b> {remaining}</b> restants
-              {requiredForNext ? <> / {requiredForNext} requis</> : null}
+              <b>{totalDone}</b> cours faits, <b>{remaining}</b> restants
             </p>
             <p>
-              Rythme actuel :{" "}
-              <b>{weeklyRate.toFixed(1)}</b> / semaine
+              Rythme actuel : <b>{weeklyRate.toFixed(1)}</b> / semaine
             </p>
             {!invite && (
               <p>
@@ -245,7 +259,37 @@ export default function DashboardView() {
         </div>
       </div>
 
-      {/* PROCHAINS ENTRAÎNEMENTS */}
+      {/* Bloc Cours faits en [année] */}
+      <div className="bg-white shadow rounded-xl p-5 border border-gray-100 mb-8">
+        <div className="flex items-center gap-3 mb-3">
+          <Calendar className="text-red-600" size={20} />
+          <h2 className="text-lg font-semibold text-red-600">
+            Cours faits en {annee}
+          </h2>
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <label className="text-sm text-gray-600">Changer d’année :</label>
+          <select
+            className="border rounded p-1 text-sm"
+            value={annee}
+            onChange={(e) => setAnnee(e.target.value)}
+          >
+            {[2023, 2024, 2025, 2026, 2027].map((y) => (
+              <option key={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+
+        <ul className="text-sm text-gray-700 leading-snug">
+          <li>🥋 Cours groupe : {yearlyStats.groupe}</li>
+          <li>💪 Armes / Combat : {yearlyStats.armes + yearlyStats.combat}</li>
+          <li>🤝 Cours privés : {yearlyStats.prive}</li>
+          <li>🏆 Compétitions : {yearlyStats.competition}</li>
+        </ul>
+      </div>
+
+      {/* Prochains entraînements */}
       <div>
         <h2 className="text-lg font-semibold text-gray-800 mb-3">
           📅 Prochains entraînements
