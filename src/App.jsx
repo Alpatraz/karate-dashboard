@@ -189,7 +189,7 @@ function lastPassageDate(events) {
 }
 
 // ==========================================================
-// VUE CALENDRIER
+// VUE CALENDRIER (avec résumé visuel)
 // ==========================================================
 function CalendarView({ events, setEvents, planning, profil, holidays }) {
   const [month, setMonth] = useState(new Date());
@@ -224,13 +224,16 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
     const today = new Date().toISOString().split("T")[0];
     const isPast = e.date < today;
 
-    let icon = "❓";
-    if (e.type === "groupe") icon = "🥋";
-    else if (e.type === "competition") icon = "🏆";
-    else if (e.type === "maison") icon = "💪";
-    else if (e.type === "passage") icon = "🎯";
-    else if (e.type === "privé") icon = "🤝";
-    else if (e.type === "seminaire") icon = "📚";
+    const icons = {
+      groupe: "🥋",
+      privé: "🤝",
+      maison: "💪",
+      competition: "🏆",
+      passage: "🎯",
+      seminaire: "📚",
+    };
+
+    const icon = icons[e.type] || "❓";
 
     let color = "text-gray-400";
     if (e.status === "fait") color = "text-green-600";
@@ -253,8 +256,6 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
     const nouvelles = [];
     days.forEach((d) => {
       const dateStr = d.toISOString().split("T")[0];
-
-      // skip jour férié / fermé
       if (holidays.includes(dateStr)) return;
 
       const jourNom = d
@@ -267,7 +268,6 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
         jourPlanning.cours.forEach((c) => {
           if (c.type !== profil) return;
 
-          // évite le doublon
           const exists = events.some(
             (ev) =>
               ev.date === dateStr &&
@@ -288,9 +288,7 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
       }
     });
 
-    if (nouvelles.length) {
-      setEvents((prev) => [...prev, ...nouvelles]);
-    }
+    if (nouvelles.length) setEvents((prev) => [...prev, ...nouvelles]);
   };
 
   // ajouter un event manuel
@@ -306,6 +304,7 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
     setEvents((prev) =>
       prev.map((e, i) => (i === index ? { ...e, status } : e))
     );
+    setSelected(null);
   };
 
   // navigation mois +/-1
@@ -323,9 +322,21 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
       .filter((e) => e.date === ds);
   };
 
-  // rendu
+  // === Nouveau : résumé statistique ===
+  const stats = useMemo(() => {
+    const faits = events.filter((e) => e.status === "fait").length;
+    const nonfaits = events.filter((e) => e.status === "non fait").length;
+    const planifies = events.filter((e) => e.status === "planifié").length;
+    const total = faits + nonfaits + planifies;
+    const taux =
+      total > 0 ? Math.round((faits / total) * 100) : 0;
+    return { faits, nonfaits, planifies, total, taux };
+  }, [events]);
+
+  // rendu principal
   return (
     <div>
+      {/* Barre d'action */}
       <div className="flex justify-between items-center mb-4 gap-2">
         <button
           onClick={() => changeMonth(-1)}
@@ -333,7 +344,7 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
         >
           ◀️
         </button>
-        <h2 className="text-2xl font-bold flex-1 text-center">
+        <h2 className="text-2xl font-bold flex-1 text-center capitalize">
           {month.toLocaleString("fr-CA", {
             month: "long",
             year: "numeric",
@@ -361,6 +372,7 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
         </button>
       </div>
 
+      {/* Grille calendrier */}
       <div className="grid grid-cols-7 gap-2">
         {days.map((d, i) => (
           <div
@@ -386,6 +398,38 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
         ))}
       </div>
 
+      {/* === Résumé des statistiques === */}
+      <div className="mt-6 bg-white border rounded-xl p-4 shadow-sm">
+        <h3 className="text-lg font-semibold mb-2 text-gray-700">
+          Résumé des entraînements
+        </h3>
+
+        {stats.total === 0 ? (
+          <p className="text-gray-500 text-sm">
+            Aucun entraînement enregistré ce mois-ci.
+          </p>
+        ) : (
+          <>
+            <div className="flex gap-4 mb-2 text-sm">
+              <span className="text-green-600">🟩 Faits : {stats.faits}</span>
+              <span className="text-orange-500">🟧 Non faits : {stats.nonfaits}</span>
+              <span className="text-gray-600">🔘 Planifiés : {stats.planifies}</span>
+            </div>
+
+            <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div
+                className="absolute top-0 left-0 h-3 bg-green-500 transition-all"
+                style={{ width: `${stats.taux}%` }}
+              ></div>
+            </div>
+
+            <p className="text-right text-xs text-gray-500 mt-1">
+              Progression : {stats.taux}%
+            </p>
+          </>
+        )}
+      </div>
+
       {/* Détails d'un event */}
       {selected && (
         <div className="fixed inset-0 bg-black/30 flex justify-center items-center z-50">
@@ -397,28 +441,22 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
 
             <div className="flex gap-2 mt-3">
               <button
-                onClick={() => {
-                  setStatus(selected.__i, "fait");
-                  setSelected(null);
-                }}
-                className="bg-green-500 text-white px-3 py-1 rounded"
+                onClick={() => setStatus(selected.__i, "fait")}
+                className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600"
               >
                 ✅ Fait
               </button>
 
               <button
-                onClick={() => {
-                  setStatus(selected.__i, "non fait");
-                  setSelected(null);
-                }}
-                className="bg-orange-500 text-white px-3 py-1 rounded"
+                onClick={() => setStatus(selected.__i, "non fait")}
+                className="bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600"
               >
                 ❌ Non fait
               </button>
 
               <button
                 onClick={() => setSelected(null)}
-                className="ml-auto text-gray-600"
+                className="ml-auto text-gray-600 hover:text-black"
               >
                 Fermer
               </button>
@@ -431,9 +469,7 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
       {showAdd && (
         <div className="fixed inset-0 bg-black/30 flex justify-center items-center z-50">
           <div className="bg-white rounded p-6 w-96 shadow-lg">
-            <h3 className="text-lg font-bold mb-2">
-              Ajouter un événement
-            </h3>
+            <h3 className="text-lg font-bold mb-2">Ajouter un événement</h3>
 
             <input
               type="text"
@@ -471,25 +507,25 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
                 setNewEvent({ ...newEvent, type: e.target.value })
               }
             >
-              <option value="groupe">Cours de groupe</option>
-              <option value="privé">Cours privé</option>
-              <option value="maison">Entraînement maison</option>
-              <option value="competition">Compétition</option>
-              <option value="passage">Passage de ceinture</option>
-              <option value="seminaire">Séminaire</option>
+              <option value="groupe">🥋 Cours de groupe</option>
+              <option value="privé">🤝 Cours privé</option>
+              <option value="maison">💪 Entraînement maison</option>
+              <option value="competition">🏆 Compétition</option>
+              <option value="passage">🎯 Passage de ceinture</option>
+              <option value="seminaire">📚 Séminaire</option>
             </select>
 
             <div className="flex gap-2">
               <button
                 onClick={addEvent}
-                className="bg-green-600 text-white px-3 py-1 rounded"
+                className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
               >
                 Ajouter
               </button>
 
               <button
                 onClick={() => setShowAdd(false)}
-                className="ml-auto text-gray-600"
+                className="ml-auto text-gray-600 hover:text-black"
               >
                 Annuler
               </button>
@@ -500,6 +536,7 @@ function CalendarView({ events, setEvents, planning, profil, holidays }) {
     </div>
   );
 }
+
 
 // ==========================================================
 // VUE BASE TECHNIQUE
