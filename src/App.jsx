@@ -241,6 +241,12 @@ export default function KarateDashboard() {
       [profId]: next,
     }));
   };
+// Charger les events dès le chargement du profil actif
+useEffect(() => {
+  if (!activeProfile) return;
+  const saved = JSON.parse(localStorage.getItem(`karate_events_${activeProfile.id}`) || "[]");
+  setEventsByProfile((prev) => ({ ...prev, [activeProfile.id]: saved }));
+}, [activeProfile]);
 
   // ---------------------------
   // Popup "Ajouter événement"
