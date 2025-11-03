@@ -1,263 +1,426 @@
 import React, { useState, useEffect } from "react";
-import { PlusCircle, Trash2, UserCheck, Save } from "lucide-react";
+import { PlusCircle, Trash2 } from "lucide-react";
 
 export default function ProfileManager() {
-  const [profiles, setProfiles] = useState(() => {
-    return JSON.parse(localStorage.getItem("karate_profiles") || "[]");
-  });
-
-  const [editing, setEditing] = useState(null); // profil en cours d’édition
+  const [profiles, setProfiles] = useState([]);
   const [form, setForm] = useState({
-    id: null,
     nom: "",
     dateNaissance: "",
     type: "Adulte",
-    club: "",
-    instructeur: "",
-    ceinture: "",
-    objectif: "",
-    notes: "",
+    dojo: "",
+    abonnementMensuel: 0,
+    combat: false,
+    armes: false,
+    combatMontant: 0,
+    armesMontant: 0,
+    federationMontant: 0,
+    federationDate: "",
+    paiements: [], // ✅ toujours initialisé
   });
 
-  // Calcul âge automatique
-  const computeAge = (dateNaissance) => {
-    if (!dateNaissance) return "";
-    const birth = new Date(dateNaissance);
-    const today = new Date();
-    let years = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) years--;
-    return years;
-  };
+  const [selectedProfile, setSelectedProfile] = useState(null);
 
-  // Sauvegarde automatique
+  // Charger les profils
   useEffect(() => {
-    localStorage.setItem("karate_profiles", JSON.stringify(profiles));
-  }, [profiles]);
+    const saved = JSON.parse(localStorage.getItem("karate_profiles") || "[]");
+    setProfiles(saved);
+  }, []);
 
-  // Sélection du profil actif
-  const setActiveProfile = (id) => {
-    const updated = profiles.map((p) => ({ ...p, actif: p.id === id }));
-    setProfiles(updated);
+  // Sauvegarde
+  const saveProfiles = (data) => {
+    setProfiles(data);
+    localStorage.setItem("karate_profiles", JSON.stringify(data));
   };
 
-  // Ajouter ou modifier
-  const saveProfile = () => {
-    if (!form.nom) return alert("Le nom est requis");
-    if (editing) {
-      setProfiles((prev) =>
-        prev.map((p) => (p.id === form.id ? { ...form } : p))
+  // Ajouter ou modifier un profil
+  const handleSave = () => {
+    let updated;
+    if (selectedProfile) {
+      updated = profiles.map((p) =>
+        p.nom === selectedProfile.nom ? { ...form } : p
       );
     } else {
-      const newProfile = {
-        ...form,
-        id: Date.now(),
-        actif: profiles.length === 0, // le premier est actif par défaut
-      };
-      setProfiles([...profiles, newProfile]);
+      updated = [...profiles, { ...form, id: Date.now() }];
     }
+    saveProfiles(updated);
     setForm({
-      id: null,
       nom: "",
       dateNaissance: "",
       type: "Adulte",
-      club: "",
-      instructeur: "",
-      ceinture: "",
-      objectif: "",
-      notes: "",
+      dojo: "",
+      abonnementMensuel: 0,
+      combat: false,
+      armes: false,
+      combatMontant: 0,
+      armesMontant: 0,
+      federationMontant: 0,
+      federationDate: "",
+      paiements: [],
     });
-    setEditing(null);
+    setSelectedProfile(null);
   };
 
-  // Supprimer
-  const deleteProfile = (id) => {
-    if (!window.confirm("Supprimer ce profil ?")) return;
-    const updated = profiles.filter((p) => p.id !== id);
-    // Si on supprime le profil actif, activer le premier restant
-    if (updated.every((p) => !p.actif) && updated.length > 0)
-      updated[0].actif = true;
-    setProfiles(updated);
+  // Supprimer un profil
+  const handleDelete = (nom) => {
+    if (window.confirm("Supprimer ce profil ?")) {
+      const updated = profiles.filter((p) => p.nom !== nom);
+      saveProfiles(updated);
+    }
   };
 
-  // Charger un profil pour édition
-  const editProfile = (p) => {
-    setForm(p);
-    setEditing(p.id);
+  // Ajouter un paiement additionnel
+  const addPayment = () => {
+    const nouveauPaiement = {
+      categorie: "",
+      detail: "",
+      montant: 0,
+      date: new Date().toISOString().split("T")[0],
+      statut: "Payé",
+      modePaiement: "",
+      payePar: "",
+    };
+    setForm({
+      ...form,
+      paiements: [...(form.paiements || []), nouveauPaiement],
+    });
   };
 
-  // Profil actif
-  const activeProfile = profiles.find((p) => p.actif);
+  const removePayment = (index) => {
+    const updated = form.paiements.filter((_, i) => i !== index);
+    setForm({ ...form, paiements: updated });
+  };
 
   return (
-    <div className="p-4 bg-white rounded-xl shadow border border-gray-100">
-      <h2 className="text-2xl font-bold text-red-600 mb-4 flex items-center gap-2">
-        👥 Gestion des profils familiaux
-      </h2>
+    <div className="p-6 text-gray-800">
+      <h1 className="text-2xl font-bold text-red-600 mb-6">
+        👨‍👩‍👧‍👦 Gestion des profils familiaux
+      </h1>
 
-      {/* Liste des profils */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      {/* === Liste des profils === */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         {profiles.map((p) => (
           <div
-            key={p.id}
-            className={`border rounded-lg p-3 shadow-sm ${
-              p.actif ? "border-red-500 bg-red-50" : "border-gray-200"
+            key={p.nom}
+            className={`border rounded-xl p-4 shadow hover:shadow-md transition ${
+              selectedProfile?.nom === p.nom ? "border-red-500" : "border-gray-200"
             }`}
           >
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-semibold text-gray-800">{p.nom}</h3>
-              {p.actif && (
-                <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">
-                  Actif
-                </span>
-              )}
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="font-semibold text-lg">{p.nom}</h2>
+                <p className="text-sm text-gray-600">
+                  {p.type} – {p.dojo || "Dojo non spécifié"}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Abonnement : ${p.abonnementMensuel || 0}/mois
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedProfile(p)}
+                  className="text-blue-600 hover:underline text-sm"
+                >
+                  Modifier
+                </button>
+                <button
+                  onClick={() => handleDelete(p.nom)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
-
-            <p className="text-sm text-gray-600">
-              Âge : {computeAge(p.dateNaissance) || "—"} ans
-            </p>
-            <p className="text-sm text-gray-600">Ceinture : {p.ceinture || "—"}</p>
-            <p className="text-sm text-gray-600">Type : {p.type}</p>
-
-            <div className="flex justify-between items-center mt-3 text-sm">
-              <button
-                onClick={() => editProfile(p)}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                ✏️ Modifier
-              </button>
-              <button
-                onClick={() => deleteProfile(p.id)}
-                className="text-red-500 hover:text-red-700"
-              >
-                <Trash2 className="inline w-4 h-4" />
-              </button>
-            </div>
-
-            {!p.actif && (
-              <button
-                onClick={() => setActiveProfile(p.id)}
-                className="mt-3 w-full bg-red-500 text-white py-1 rounded hover:bg-red-600 text-sm"
-              >
-                <UserCheck className="inline w-4 h-4 mr-1" /> Activer
-              </button>
-            )}
           </div>
         ))}
 
-        {/* Ajouter un profil */}
-        <button
-          onClick={() => setEditing(null)}
-          className="border-2 border-dashed rounded-lg flex flex-col items-center justify-center py-6 hover:bg-gray-50"
+        <div
+          onClick={() => setSelectedProfile(null)}
+          className="border-dashed border-2 border-gray-300 rounded-xl p-4 flex items-center justify-center text-gray-500 hover:text-red-600 hover:border-red-500 cursor-pointer"
         >
-          <PlusCircle className="text-gray-400 w-6 h-6 mb-1" />
-          <span className="text-sm text-gray-600">Ajouter un profil</span>
-        </button>
+          <PlusCircle className="mr-2" /> Ajouter un profil
+        </div>
       </div>
 
-      {/* Formulaire d’ajout / édition */}
-      <div className="border-t pt-4">
-        <h3 className="text-lg font-semibold text-gray-700 mb-3">
-          {editing ? "Modifier le profil" : "Ajouter un nouveau profil"}
-        </h3>
+      {/* === Formulaire profil === */}
+      <div className="bg-white border rounded-xl shadow p-6">
+        <h2 className="text-xl font-semibold mb-4 text-red-600">
+          {selectedProfile ? "Modifier le profil" : "Créer un profil"}
+        </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
-            type="text"
-            placeholder="Nom"
-            value={form.nom}
-            onChange={(e) => setForm({ ...form, nom: e.target.value })}
-            className="border rounded p-2"
-          />
-          <input
-            type="date"
-            value={form.dateNaissance}
-            onChange={(e) => setForm({ ...form, dateNaissance: e.target.value })}
-            className="border rounded p-2"
-          />
-          <select
-            value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value })}
-            className="border rounded p-2"
-          >
-            <option value="Enfant">Enfant</option>
-            <option value="Ado">Ado</option>
-            <option value="Adulte">Adulte</option>
-          </select>
-          <input
-            type="text"
-            placeholder="Club"
-            value={form.club}
-            onChange={(e) => setForm({ ...form, club: e.target.value })}
-            className="border rounded p-2"
-          />
-          <input
-            type="text"
-            placeholder="Instructeur"
-            value={form.instructeur}
-            onChange={(e) => setForm({ ...form, instructeur: e.target.value })}
-            className="border rounded p-2"
-          />
-          <input
-            type="text"
-            placeholder="Ceinture"
-            value={form.ceinture}
-            onChange={(e) => setForm({ ...form, ceinture: e.target.value })}
-            className="border rounded p-2"
-          />
-          <input
-            type="text"
-            placeholder="Objectif"
-            value={form.objectif}
-            onChange={(e) => setForm({ ...form, objectif: e.target.value })}
-            className="border rounded p-2"
-          />
+        {/* Nom et date */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="text-sm text-gray-600">Nom du profil</label>
+            <input
+              type="text"
+              className="border rounded p-2 w-full"
+              value={form.nom}
+              onChange={(e) => setForm({ ...form, nom: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm text-gray-600">Date de naissance</label>
+            <input
+              type="date"
+              className="border rounded p-2 w-full"
+              value={form.dateNaissance}
+              onChange={(e) => setForm({ ...form, dateNaissance: e.target.value })}
+            />
+          </div>
         </div>
 
-        <textarea
-          placeholder="Notes"
-          value={form.notes}
-          onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          className="border rounded p-2 w-full mt-2"
-          rows={3}
-        />
-
-        <div className="flex justify-end gap-2 mt-3">
-          <button
-            onClick={saveProfile}
-            className="bg-red-600 text-white px-4 py-2 rounded flex items-center gap-1 hover:bg-red-700"
-          >
-            <Save className="w-4 h-4" /> Enregistrer
-          </button>
-          {editing && (
-            <button
-              onClick={() => {
-                setForm({
-                  id: null,
-                  nom: "",
-                  dateNaissance: "",
-                  type: "Adulte",
-                  club: "",
-                  instructeur: "",
-                  ceinture: "",
-                  objectif: "",
-                  notes: "",
-                });
-                setEditing(null);
-              }}
-              className="text-gray-600 hover:text-black"
+        {/* Type / Dojo */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="text-sm text-gray-600">Type</label>
+            <select
+              className="border rounded p-2 w-full"
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
             >
-              Annuler
+              <option>Adulte</option>
+              <option>Enfant</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm text-gray-600">Dojo</label>
+            <input
+              type="text"
+              className="border rounded p-2 w-full"
+              value={form.dojo}
+              onChange={(e) => setForm({ ...form, dojo: e.target.value })}
+            />
+          </div>
+        </div>
+
+        {/* Abonnement */}
+        <div className="mb-6">
+          <h3 className="font-semibold text-gray-800 mb-2">💳 Abonnement mensuel</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-sm text-gray-600">Base ($)</label>
+              <input
+                type="number"
+                className="border rounded p-2 w-full text-right"
+                value={form.abonnementMensuel}
+                onChange={(e) =>
+                  setForm({ ...form, abonnementMensuel: parseFloat(e.target.value) || 0 })
+                }
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.combat}
+                onChange={(e) => setForm({ ...form, combat: e.target.checked })}
+              />
+              <span>Combat</span>
+              <input
+                type="number"
+                placeholder="$/mois"
+                className="border rounded p-2 w-20 text-right"
+                value={form.combatMontant}
+                onChange={(e) =>
+                  setForm({ ...form, combatMontant: parseFloat(e.target.value) || 0 })
+                }
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={form.armes}
+                onChange={(e) => setForm({ ...form, armes: e.target.checked })}
+              />
+              <span>Armes</span>
+              <input
+                type="number"
+                placeholder="$/mois"
+                className="border rounded p-2 w-20 text-right"
+                value={form.armesMontant}
+                onChange={(e) =>
+                  setForm({ ...form, armesMontant: parseFloat(e.target.value) || 0 })
+                }
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Fédération */}
+        <div className="mb-6">
+          <h3 className="font-semibold text-gray-800 mb-2">🏛️ Fédération</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-gray-600">Montant ($)</label>
+              <input
+                type="number"
+                className="border rounded p-2 w-full text-right"
+                value={form.federationMontant}
+                onChange={(e) =>
+                  setForm({ ...form, federationMontant: parseFloat(e.target.value) || 0 })
+                }
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-600">Date de renouvellement</label>
+              <input
+                type="date"
+                className="border rounded p-2 w-full"
+                value={form.federationDate}
+                onChange={(e) => setForm({ ...form, federationDate: e.target.value })}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Paiements additionnels */}
+        <div className="mb-6">
+          <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            💰 Paiements additionnels
+            <button
+              onClick={addPayment}
+              className="text-green-600 hover:text-green-800 text-sm flex items-center gap-1"
+            >
+              <PlusCircle size={16} /> Ajouter
             </button>
+          </h3>
+
+          {form.paiements.length === 0 ? (
+            <p className="text-gray-500 text-sm">Aucun paiement ajouté.</p>
+          ) : (
+            <table className="w-full text-sm border">
+              <thead className="bg-gray-100 text-gray-700">
+                <tr>
+                  <th className="p-2 text-left">Catégorie</th>
+                  <th className="p-2 text-left">Détail</th>
+                  <th className="p-2 text-right">Montant ($)</th>
+                  <th className="p-2 text-center">Date</th>
+                  <th className="p-2 text-center">Mode de paiement</th>
+                  <th className="p-2 text-center">Payé par</th>
+                  <th className="p-2 text-center">Statut</th>
+                  <th className="p-2 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {form.paiements.map((p, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        value={p.categorie}
+                        onChange={(e) => {
+                          const updated = [...form.paiements];
+                          updated[i].categorie = e.target.value;
+                          setForm({ ...form, paiements: updated });
+                        }}
+                        className="border rounded p-1 w-full"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="text"
+                        value={p.detail}
+                        onChange={(e) => {
+                          const updated = [...form.paiements];
+                          updated[i].detail = e.target.value;
+                          setForm({ ...form, paiements: updated });
+                        }}
+                        className="border rounded p-1 w-full"
+                      />
+                    </td>
+                    <td className="p-2 text-right">
+                      <input
+                        type="number"
+                        value={p.montant}
+                        onChange={(e) => {
+                          const updated = [...form.paiements];
+                          updated[i].montant = parseFloat(e.target.value) || 0;
+                          setForm({ ...form, paiements: updated });
+                        }}
+                        className="border rounded p-1 w-24 text-right"
+                      />
+                    </td>
+                    <td className="p-2 text-center">
+                      <input
+                        type="date"
+                        value={p.date}
+                        onChange={(e) => {
+                          const updated = [...form.paiements];
+                          updated[i].date = e.target.value;
+                          setForm({ ...form, paiements: updated });
+                        }}
+                        className="border rounded p-1"
+                      />
+                    </td>
+                    <td className="p-2 text-center">
+                      <select
+                        value={p.modePaiement}
+                        onChange={(e) => {
+                          const updated = [...form.paiements];
+                          updated[i].modePaiement = e.target.value;
+                          setForm({ ...form, paiements: updated });
+                        }}
+                        className="border rounded p-1"
+                      >
+                        <option value="">—</option>
+                        <option>Carte de crédit</option>
+                        <option>Carte de débit</option>
+                        <option>Interac</option>
+                        <option>Cash</option>
+                        <option>Prélèvement</option>
+                      </select>
+                    </td>
+                    <td className="p-2 text-center">
+                      <select
+                        value={p.payePar}
+                        onChange={(e) => {
+                          const updated = [...form.paiements];
+                          updated[i].payePar = e.target.value;
+                          setForm({ ...form, paiements: updated });
+                        }}
+                        className="border rounded p-1"
+                      >
+                        <option value="">—</option>
+                        <option>Guillaume</option>
+                        <option>Séverine</option>
+                        <option>Autre</option>
+                      </select>
+                    </td>
+                    <td className="p-2 text-center">
+                      <select
+                        value={p.statut}
+                        onChange={(e) => {
+                          const updated = [...form.paiements];
+                          updated[i].statut = e.target.value;
+                          setForm({ ...form, paiements: updated });
+                        }}
+                        className="border rounded p-1"
+                      >
+                        <option>Payé</option>
+                        <option>À payer</option>
+                      </select>
+                    </td>
+                    <td className="p-2 text-center">
+                      <button
+                        onClick={() => removePayment(i)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
-      </div>
 
-      {activeProfile && (
-        <p className="text-xs text-gray-500 mt-4 italic">
-          Profil actif : {activeProfile.nom} ({activeProfile.ceinture || "—"})
-        </p>
-      )}
+        <button
+          onClick={handleSave}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+        >
+          Enregistrer le profil
+        </button>
+      </div>
     </div>
   );
 }

@@ -260,34 +260,83 @@ export default function DashboardView({ activeProfile, events = [], belts = [] }
       </div>
 
       {/* Bloc Cours faits en [année] */}
-      <div className="bg-white shadow rounded-xl p-5 border border-gray-100 mb-8">
-        <div className="flex items-center gap-3 mb-3">
-          <Calendar className="text-red-600" size={20} />
-          <h2 className="text-lg font-semibold text-red-600">
-            Cours faits en {annee}
-          </h2>
-        </div>
+<div className="bg-gradient-to-r from-red-50 to-white border border-red-200 rounded-xl shadow-sm p-5 mb-8">
+  <div className="flex items-center justify-between mb-4">
+    <div className="flex items-center gap-3">
+      <Calendar className="text-red-600" size={22} />
+      <h2 className="text-lg font-semibold text-red-700">
+        📅 Cours faits en {annee}
+      </h2>
+    </div>
+    <div className="flex items-center gap-2">
+      <label className="text-sm text-gray-600">Changer d’année :</label>
+      <select
+        className="border border-gray-300 rounded p-1 text-sm bg-white"
+        value={annee}
+        onChange={(e) => setAnnee(e.target.value)}
+      >
+        {[2023, 2024, 2025, 2026, 2027].map((y) => (
+          <option key={y}>{y}</option>
+        ))}
+      </select>
+    </div>
+  </div>
 
-        <div className="flex gap-2 mb-4">
-          <label className="text-sm text-gray-600">Changer d’année :</label>
-          <select
-            className="border rounded p-1 text-sm"
-            value={annee}
-            onChange={(e) => setAnnee(e.target.value)}
-          >
-            {[2023, 2024, 2025, 2026, 2027].map((y) => (
-              <option key={y}>{y}</option>
-            ))}
-          </select>
+  {Object.values(yearlyStats).every((v) => v === 0) ? (
+    <p className="text-gray-500 text-sm italic">
+      Aucun cours enregistré pour cette année.
+    </p>
+  ) : (
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+      <div className="bg-white border border-red-100 rounded-lg p-3 shadow-sm">
+        <div className="text-xl">🥋</div>
+        <div className="font-semibold text-gray-800">
+          {yearlyStats.groupe}
         </div>
-
-        <ul className="text-sm text-gray-700 leading-snug">
-          <li>🥋 Cours groupe : {yearlyStats.groupe}</li>
-          <li>💪 Armes / Combat : {yearlyStats.armes + yearlyStats.combat}</li>
-          <li>🤝 Cours privés : {yearlyStats.prive}</li>
-          <li>🏆 Compétitions : {yearlyStats.competition}</li>
-        </ul>
+        <div className="text-xs text-gray-500">Cours groupe</div>
       </div>
+
+      <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
+        <div className="text-xl">🤝</div>
+        <div className="font-semibold text-gray-800">
+          {yearlyStats.prive}
+        </div>
+        <div className="text-xs text-gray-500">
+          Cours privés <span className="text-[10px]">(x4)</span>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
+        <div className="text-xl">💪</div>
+        <div className="font-semibold text-gray-800">
+          {yearlyStats.armes + yearlyStats.combat}
+        </div>
+        <div className="text-xs text-gray-500">Armes / Combat</div>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
+        <div className="text-xl">🏆</div>
+        <div className="font-semibold text-gray-800">
+          {yearlyStats.competition}
+        </div>
+        <div className="text-xs text-gray-500">Compétitions</div>
+      </div>
+
+      <div className="bg-white border border-red-100 rounded-lg p-3 shadow-sm">
+        <div className="text-2xl font-bold text-red-600">
+          {yearlyStats.groupe +
+            yearlyStats.prive * 4 +
+            yearlyStats.armes +
+            yearlyStats.combat}
+        </div>
+        <div className="text-xs text-gray-600 uppercase tracking-wide">
+          Total points
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+
 
       {/* Prochains entraînements */}
       <div>
