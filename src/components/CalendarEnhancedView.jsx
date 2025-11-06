@@ -1,6 +1,16 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { PlusCircle } from "lucide-react";
+import {
+  PlusCircle,
+  CheckCircle2,
+  CircleSlash,
+  Clock4,
+  Edit3,
+  Trash2,
+  CalendarPlus,
+  Users as UsersIcon,
+} from "lucide-react";
 import AddEventModal from "./AddEventModal";
+import BulkPrivatesModal from "./BulkPrivatesModal";
 
 export default function CalendarEnhancedView({
   events,
@@ -18,6 +28,8 @@ export default function CalendarEnhancedView({
   const [selectedDate, setSelectedDate] = useState(todayISO);
   const [filterStatus, setFilterStatus] = useState("tous");
   const [filterType, setFilterType] = useState("tous");
+  const [showBulk, setShowBulk] = useState(false);
+  const [editDraft, setEditDraft] = useState(null); // {index, event}
 
   // --------------------------
   // 2. Table d’icônes par type
@@ -33,7 +45,7 @@ export default function CalendarEnhancedView({
   };
 
   // --------------------------
-  // 3. Marquer automatiquement "non fait" si passé
+  // 3. Marquer auto "non fait" si passé
   // --------------------------
   useEffect(() => {
     const now = new Date();
@@ -48,7 +60,7 @@ export default function CalendarEnhancedView({
     );
 
     const updated = events.map((e) => {
-      if (e.status === "planifié") {
+      if (e.status === "planifié" && e.date) {
         const [y, m, d] = e.date.split("-");
         const evDate = new Date(y, m - 1, d);
         if (evDate < todayMidnight) return { ...e, status: "non fait" };
@@ -62,35 +74,88 @@ export default function CalendarEnhancedView({
   }, [events, setEvents]);
 
   // --------------------------
-  // 4. Conversion date -> jour FR
+  // 4. Helpers
   // --------------------------
-  function weekdayFr(dateStr) {
+  const weekdayFr = (dateStr) => {
     const [y, m, d] = dateStr.split("-");
     const dt = new Date(y, m - 1, d);
-    const mapping = [
-      "Dimanche",
-      "Lundi",
-      "Mardi",
-      "Mercredi",
-      "Jeudi",
-      "Vendredi",
-      "Samedi",
-    ];
-    return mapping[dt.getDay()];
-  }
+    return dt.toLocaleDateString("fr-CA", { weekday: "long" });
+  };
+
+  const ensureId = (e) =>
+    e.id ||
+    `${e.date ?? "?"}|${e.time ?? "?"}|${e.title ?? "?"}|${
+      e.profileId ?? "p"
+    }`;
+
+  const upsertEvent = (evObj) => {
+    const key = ensureId(evObj);
+    setEvents((prev) => {
+      const idx = prev.findIndex((x) => ensureId(x) === key);
+      if (idx === -1) return [...prev, { ...evObj, id: key }];
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...evObj, id: key };
+      return next;
+    });
+  };
+
+  const deleteEvent = (evObj) => {
+    const key = ensureId(evObj);
+    setEvents((prev) => prev.filter((x) => ensureId(x) !== key));
+  };
+
+  const markStatus = (evObj, status) => {
+    upsertEvent({
+      ...evObj,
+      status,
+      profileId: activeProfile?.id || "unknown",
+    });
+  };
+
+  // ------------------------------------------------------
+  // 5. Ajouter un paiement dans Finance pour le profil actif
+  // ------------------------------------------------------
+  const addPaymentToFinance = (profile, paiement) => {
+    if (!profile) return;
+    const profiles = JSON.parse(localStorage.getItem("karate_profiles") || "[]");
+
+    const updated = profiles.map((p) => {
+      if (p.id !== profile.id) return p;
+
+      const existing = Array.isArray(p.paiements) ? p.paiements : [];
+      return {
+        ...p,
+        paiements: [
+          ...existing,
+          {
+            type: paiement.type || "Cours privé",
+            montant: paiement.montant || 0,
+            date: paiement.date || new Date().toISOString().split("T")[0],
+            statut: paiement.statut || "À payer",
+            payeur: profile.nom || "Inconnu",
+            methode: paiement.methode || "—",
+          },
+        ],
+      };
+    });
+
+    localStorage.setItem("karate_profiles", JSON.stringify(updated));
+  };
 
   // --------------------------
-  // 5. Cours automatiques du planning
+  // 6. Cours automatiques du planning
   // --------------------------
   const autoLessonsForDay = useMemo(() => {
     if (!planning) return [];
     const wd = weekdayFr(selectedDate);
-    const bloc = planning.find((p) => p.jour === wd);
+    const bloc = planning.find(
+      (p) => p.jour.toLowerCase() === wd.toLowerCase()
+    );
     if (!bloc) return [];
     return bloc.cours.map((c) => ({
       title: c.nom || "Cours de groupe",
       time: c.heure || "",
-      type: "groupe",
+      type: c.type || "groupe",
       date: selectedDate,
       status: "planifié",
       profileId: activeProfile?.id || "unknown",
@@ -98,7 +163,7 @@ export default function CalendarEnhancedView({
   }, [planning, selectedDate, activeProfile]);
 
   // --------------------------
-  // 6. Fusion : events réels + auto du jour
+  // 7. Fusion : events réels + auto du jour
   // --------------------------
   const dayEventsMerged = useMemo(() => {
     const manualThatDay = events.filter((e) => e.date === selectedDate);
@@ -115,52 +180,25 @@ export default function CalendarEnhancedView({
   }, [events, autoLessonsForDay, selectedDate]);
 
   // --------------------------
-  // 7. Filtrage affiché
+  // 8. Filtrage affiché
   // --------------------------
   const filteredEvents = useMemo(() => {
     return dayEventsMerged
       .filter((e) =>
-        filterStatus === "tous" ? true : e.status === filterStatus
+        filterStatus === "tous" ? true : (e.status || "planifié") === filterStatus
       )
-      .filter((e) =>
-        filterType === "tous" ? true : e.type === filterType
-      )
+      .filter((e) => (filterType === "tous" ? true : e.type === filterType))
       .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   }, [dayEventsMerged, filterStatus, filterType]);
 
   // --------------------------
-  // 8. Toggle du statut
-  // --------------------------
-  const toggleStatus = (evObj) => {
-    const statusCycle = ["planifié", "fait", "non fait"];
-    setEvents((prev) => {
-      let foundIndex = prev.findIndex(
-        (p) =>
-          p.date === evObj.date &&
-          p.time === evObj.time &&
-          p.title === evObj.title
-      );
-      let newList = [...prev];
-      if (foundIndex === -1) {
-        foundIndex = newList.length;
-        newList.push({ ...evObj, status: "planifié" });
-      }
-      const currStatus = newList[foundIndex].status || "planifié";
-      const nextStatus =
-        statusCycle[(statusCycle.indexOf(currStatus) + 1) % 3];
-      newList[foundIndex] = { ...newList[foundIndex], status: nextStatus };
-      return newList;
-    });
-  };
-
-  // --------------------------
-  // 9. Statistiques du mois sélectionné
+  // 9. Stats du mois sélectionné
   // --------------------------
   const statsMonth = useMemo(() => {
     const [y, m] = selectedDate.split("-");
     const prefix = `${y}-${m}`;
     const doneThisMonth = events.filter(
-      (e) => e.status === "fait" && e.date.startsWith(prefix)
+      (e) => e.status === "fait" && e.date?.startsWith(prefix)
     );
 
     const groupCount = doneThisMonth.filter((e) => e.type === "groupe").length;
@@ -197,12 +235,68 @@ export default function CalendarEnhancedView({
   }, [events, activeProfile]);
 
   // --------------------------
-  // RENDER
+  // 11. Générer les cours du mois (planning récurrent)
+  // --------------------------
+  const generateMonthFromPlanning = () => {
+    if (!planning || planning.length === 0) {
+      alert("⚠️ Aucun planning défini dans les paramètres !");
+      return;
+    }
+
+    const now = new Date(selectedDate);
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const toAdd = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+        d
+      ).padStart(2, "0")}`;
+
+      const dayName = new Date(year, month, d).toLocaleDateString("fr-CA", {
+        weekday: "long",
+      });
+
+      const bloc = planning.find(
+        (p) => p.jour.toLowerCase() === dayName.toLowerCase()
+      );
+      if (!bloc) continue;
+
+      bloc.cours.forEach((c) => {
+        const ev = {
+          date,
+          title: c.nom || "Cours de groupe",
+          time: c.heure || "",
+          type: c.type || "groupe",
+          status: "planifié",
+          profileId: activeProfile?.id || "unknown",
+        };
+        toAdd.push({ ...ev, id: ensureId(ev) });
+      });
+    }
+
+    setEvents((prev) => {
+      const existing = new Set(prev.map((e) => ensureId(e)));
+      const fresh = toAdd.filter((e) => !existing.has(ensureId(e)));
+      return [...prev, ...fresh];
+    });
+
+    alert(
+      `✅ ${toAdd.length} cours générés pour ${now.toLocaleString("fr-CA", {
+        month: "long",
+        year: "numeric",
+      })}`
+    );
+  };
+
+  // --------------------------
+  // 12. Rendu principal
   // --------------------------
   return (
     <div className="space-y-6">
       {/* Barre filtres / actions */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="font-medium text-gray-700">
           {activeProfile
             ? `${activeProfile.nom} — suivi d'entraînement`
@@ -255,112 +349,20 @@ export default function CalendarEnhancedView({
         </button>
 
         <button
-          onClick={() => {
-            if (!planning || planning.length === 0) {
-              alert("⚠️ Aucun planning défini dans les paramètres !");
-              return;
-            }
-            const now = new Date(selectedDate);
-            const year = now.getFullYear();
-            const month = now.getMonth();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
+          onClick={() => setShowBulk(true)}
+          className="flex items-center gap-2 bg-gray-800 text-white px-3 py-1.5 rounded hover:bg-black text-sm"
+        >
+          <UsersIcon className="w-4 h-4" />
+          Ajouter plusieurs cours privés
+        </button>
 
-            const newEvents = [];
-            for (let d = 1; d <= daysInMonth; d++) {
-              const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(
-                d
-              ).padStart(2, "0")}`;
-              const dayName = new Date(year, month, d).toLocaleDateString(
-                "fr-CA",
-                { weekday: "long" }
-              );
-              const bloc = planning.find(
-                (p) => p.jour.toLowerCase() === dayName.toLowerCase()
-              );
-              if (bloc) {
-                bloc.cours.forEach((c) => {
-                  newEvents.push({
-                    date,
-                    title: c.nom,
-                    time: c.heure,
-                    type: c.type || "groupe",
-                    status: "planifié",
-                    profileId: activeProfile?.id || "unknown",
-                  });
-                });
-              }
-            }
-
-            setEvents((prev) => [...prev, ...newEvents]);
-            alert(
-              `✅ ${newEvents.length} cours générés pour ${now.toLocaleString(
-                "fr-CA",
-                { month: "long", year: "numeric" }
-              )}`
-            );
-          }}
+        <button
+          onClick={generateMonthFromPlanning}
           className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 text-sm"
         >
-          📆 Générer les cours du mois
+          <CalendarPlus className="w-4 h-4" />
+          Générer les cours du mois
         </button>
-      </div>
-
-      {/* Bloc Statistiques du mois amélioré */}
-      <div className="bg-gradient-to-r from-red-50 to-white border border-red-200 rounded-xl shadow-sm p-5">
-        <h3 className="text-red-700 font-semibold mb-3 flex items-center gap-2 text-base">
-          📊 Statistiques du mois sélectionné
-        </h3>
-
-        {statsMonth.totalDone === 0 ? (
-          <p className="text-gray-500 text-sm italic">
-            Aucun cours enregistré pour ce mois.
-          </p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
-            <div className="bg-white border border-red-100 rounded-lg p-3 shadow-sm">
-              <div className="text-2xl font-bold text-red-600">
-                {statsMonth.totalDone}
-              </div>
-              <div className="text-xs text-gray-600 uppercase tracking-wide">
-                Total points
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
-              <div className="text-xl">🥋</div>
-              <div className="font-semibold text-gray-800">
-                {statsMonth.groupCount}
-              </div>
-              <div className="text-xs text-gray-500">Cours groupe</div>
-            </div>
-
-            <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
-              <div className="text-xl">🤝</div>
-              <div className="font-semibold text-gray-800">
-                {statsMonth.privateCount}
-              </div>
-              <div className="text-xs text-gray-500">
-                Cours privés <span className="text-[10px]">(x4)</span>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
-              <div className="text-xl">💪</div>
-              <div className="font-semibold text-gray-800">
-                {statsMonth.combatCount}
-              </div>
-              <div className="text-xs text-gray-500">Armes / Combat</div>
-            </div>
-
-            <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
-              <div className="text-xl">🏆</div>
-              <div className="font-semibold text-gray-800">
-                {statsMonth.competitionCount}
-              </div>
-              <div className="text-xs text-gray-500">Compétitions</div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Liste du jour */}
@@ -374,30 +376,71 @@ export default function CalendarEnhancedView({
           </p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {filteredEvents.map((e, i) => {
+            {filteredEvents.map((e) => {
+              const status = e.status || "planifié";
               const colorClass =
-                e.status === "fait"
-                  ? "bg-green-100 border-green-400"
-                  : e.status === "non fait"
-                  ? "bg-red-100 border-red-400"
+                status === "fait"
+                  ? "bg-green-50 border-green-400"
+                  : status === "non fait"
+                  ? "bg-red-50 border-red-400"
                   : "bg-white border-gray-200";
+
               return (
                 <div
-                  key={i}
-                  onClick={() => toggleStatus(e)}
-                  className={`border rounded-xl p-4 cursor-pointer hover:shadow transition ${colorClass}`}
+                  key={ensureId(e)}
+                  className={`border rounded-xl p-4 hover:shadow transition ${colorClass}`}
                 >
-                  <div className="text-2xl mb-2">
-                    {ICONS[e.type || "groupe"] || "🥋"}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-2xl">{ICONS[e.type || "groupe"] || "🥋"}</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        title="Marquer fait"
+                        onClick={() => markStatus(e, "fait")}
+                        className="p-1 rounded hover:bg-green-100"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      </button>
+                      <button
+                        title="Marquer non fait"
+                        onClick={() => markStatus(e, "non fait")}
+                        className="p-1 rounded hover:bg-red-100"
+                      >
+                        <CircleSlash className="w-4 h-4 text-red-600" />
+                      </button>
+                      <button
+                        title="Remettre planifié"
+                        onClick={() => markStatus(e, "planifié")}
+                        className="p-1 rounded hover:bg-gray-100"
+                      >
+                        <Clock4 className="w-4 h-4 text-gray-600" />
+                      </button>
+                      <button
+                        title="Éditer"
+                        onClick={() =>
+                          setEditDraft({
+                            event: { ...e },
+                          })
+                        }
+                        className="p-1 rounded hover:bg-blue-100"
+                      >
+                        <Edit3 className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button
+                        title="Supprimer"
+                        onClick={() => deleteEvent(e)}
+                        className="p-1 rounded hover:bg-red-100"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
                   </div>
-                  <h4 className="font-semibold text-gray-800 mb-1">
+
+                  <h4 className="font-semibold text-gray-800 mt-2">
                     {e.title || "Sans titre"}
                   </h4>
-                  <p className="text-gray-600 text-sm mb-1">
-                    {e.time || "Heure ?"}
-                  </p>
+                  <p className="text-gray-600 text-sm">{e.time || "Heure ?"}</p>
                   <p className="text-xs text-gray-500 italic">
-                    {e.type} — {e.status}
+                    {e.type} — {status}
                   </p>
                 </div>
               );
@@ -406,12 +449,134 @@ export default function CalendarEnhancedView({
         )}
       </div>
 
+      {/* Modals */}
       <AddEventModal
         show={showAdd}
         onClose={() => setShowAdd(false)}
-        onAdd={handleAddEvent}
-        activeProfile={activeProfile}
+        onAdd={(ev) => {
+          const withMeta = {
+            ...ev,
+            status: ev.status || "planifié",
+            profileId: activeProfile?.id || "unknown",
+          };
+          handleAddEvent(withMeta);
+          if (["privé", "semi"].includes(ev.type) && ev.prix > 0) {
+            addPaymentToFinance(activeProfile, {
+              type: ev.type === "semi" ? "Cours demi-privé" : "Cours privé",
+              montant: ev.prix,
+              date: ev.date,
+              statut: "À payer",
+            });
+          }
+        }}
       />
+
+      <BulkPrivatesModal
+        show={showBulk}
+        onClose={() => setShowBulk(false)}
+        onAddMany={(list) => {
+          const withMeta = list.map((ev) => ({
+            ...ev,
+            profileId: activeProfile?.id || "unknown",
+            status: "planifié",
+          }));
+          setEvents((prev) => [...prev, ...withMeta]);
+          setShowBulk(false);
+          list.forEach((ev) => {
+            if (["privé", "semi"].includes(ev.type) && ev.prix > 0) {
+              addPaymentToFinance(activeProfile, {
+                type: ev.type === "semi" ? "Cours demi-privé" : "Cours privé",
+                montant: ev.prix,
+                date: ev.date,
+                statut: "À payer",
+              });
+            }
+          });
+        }}
+      />
+      {/* --- Modal d'édition d'un cours --- */}
+{editDraft && (
+  <div className="fixed inset-0 bg-black/30 flex justify-center items-center z-50">
+    <div className="bg-white rounded-lg p-5 w-[420px] shadow-xl">
+      <h3 className="font-semibold mb-3">Modifier l’événement</h3>
+
+      <input
+        className="border p-2 w-full rounded mb-2"
+        value={editDraft.event.title || ""}
+        onChange={(e) =>
+          setEditDraft((d) => ({
+            ...d,
+            event: { ...d.event, title: e.target.value },
+          }))
+        }
+        placeholder="Titre"
+      />
+
+      <input
+        type="date"
+        className="border p-2 w-full rounded mb-2"
+        value={editDraft.event.date || ""}
+        onChange={(e) =>
+          setEditDraft((d) => ({
+            ...d,
+            event: { ...d.event, date: e.target.value },
+          }))
+        }
+      />
+
+      <input
+        className="border p-2 w-full rounded mb-2"
+        value={editDraft.event.time || ""}
+        onChange={(e) =>
+          setEditDraft((d) => ({
+            ...d,
+            event: { ...d.event, time: e.target.value },
+          }))
+        }
+        placeholder="Heure (ex: 18h-19h)"
+      />
+
+      <select
+        className="border p-2 w-full rounded mb-3"
+        value={editDraft.event.type || "groupe"}
+        onChange={(e) =>
+          setEditDraft((d) => ({
+            ...d,
+            event: { ...d.event, type: e.target.value },
+          }))
+        }
+      >
+        <option value="groupe">Cours de groupe</option>
+        <option value="privé">Cours privé</option>
+        <option value="semi">Demi-privé</option>
+        <option value="maison">Entraînement maison</option>
+        <option value="competition">Compétition</option>
+        <option value="passage">Passage de ceinture</option>
+        <option value="seminaire">Séminaire</option>
+      </select>
+
+      <div className="flex justify-end gap-2">
+        <button
+          className="px-3 py-2 rounded bg-gray-100"
+          onClick={() => setEditDraft(null)}
+        >
+          Annuler
+        </button>
+        <button
+          className="px-3 py-2 rounded bg-blue-600 text-white"
+          onClick={() => {
+            // met à jour (créé si auto-cours sans id)
+            upsertEvent(editDraft.event);
+            setEditDraft(null);
+          }}
+        >
+          Sauvegarder
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

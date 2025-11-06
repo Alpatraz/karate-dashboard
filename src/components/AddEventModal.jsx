@@ -1,5 +1,37 @@
 import React, { useState, useEffect } from "react";
 
+// --- helpers prix instructeur (robuste aux variantes de clés) ---
+const num = (v) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const getPrivRate = (inst) =>
+  num(
+    inst?.tarifPrive ??
+      inst?.tarif_prive ??
+      inst?.tarifPrivé ??
+      inst?.["tarif privé"] ??
+      0
+  );
+
+const getSemiPrivRate = (inst) =>
+  num(
+    inst?.tarifSemiPrive ??
+      inst?.tarif_semi_prive ??
+      inst?.tarifSemiPrivé ??
+      inst?.["tarif semi-prive"] ??
+      inst?.["tarif semi-privé"] ??
+      0
+  );
+
+const normType = (t = "") => {
+  const s = t.toString().toLowerCase();
+  if (s.includes("semi")) return "semi";
+  if (s.includes("priv")) return "privé";
+  return "groupe";
+};
+
 export default function AddEventModal({ show, onClose, onAdd }) {
   const [newEvent, setNewEvent] = useState({
     title: "",
@@ -13,6 +45,14 @@ export default function AddEventModal({ show, onClose, onAdd }) {
 
   const instructors = JSON.parse(localStorage.getItem("karate_instructors") || "[]");
 
+  const computePrice = (type, instructorId) => {
+    const inst = instructors.find((i) => i.id === instructorId);
+    if (!inst) return 0;
+    const t = normType(type);
+    return t === "semi" ? getSemiPrivRate(inst) : getPrivRate(inst);
+  };
+
+  // Reset quand on ferme
   useEffect(() => {
     if (!show) {
       setNewEvent({
@@ -27,6 +67,15 @@ export default function AddEventModal({ show, onClose, onAdd }) {
     }
   }, [show]);
 
+  // 🔥 IMPORTANT : ce hook doit être AVANT le if (!show)
+  // Recalcule le prix quand le type change
+  useEffect(() => {
+    setNewEvent((prev) => ({
+      ...prev,
+      prix: computePrice(prev.type, prev.instructor),
+    }));
+  }, [newEvent.type]); // recalcul automatique quand on change de type
+
   if (!show) return null;
 
   const handleAdd = () => {
@@ -36,12 +85,11 @@ export default function AddEventModal({ show, onClose, onAdd }) {
   };
 
   const handleInstructorChange = (id) => {
-    const inst = instructors.find((i) => i.id === id);
-    setNewEvent({
-      ...newEvent,
+    setNewEvent((prev) => ({
+      ...prev,
       instructor: id,
-      prix: inst ? inst.tarif_prive || 0 : 0,
-    });
+      prix: computePrice(prev.type, id),
+    }));
   };
 
   return (

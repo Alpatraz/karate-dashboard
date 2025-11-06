@@ -170,6 +170,40 @@ export default function FinanceView() {
     return res;
   }, [profiles]);
 
+// ------------------------------------------------------
+// Ajouter un paiement dans Finance pour le profil actif
+// ------------------------------------------------------
+const addPaymentToFinance = (profile, paiement) => {
+    if (!profile) return;
+  
+    // Charger tous les profils existants
+    const profiles = JSON.parse(localStorage.getItem("karate_profiles") || "[]");
+  
+    const updated = profiles.map((p) => {
+      if (p.id !== profile.id) return p;
+  
+      const existing = Array.isArray(p.paiements) ? p.paiements : [];
+  
+      return {
+        ...p,
+        paiements: [
+          ...existing,
+          {
+            type: paiement.type || "Cours privé",
+            montant: paiement.montant || 0,
+            date: paiement.date || new Date().toISOString().split("T")[0],
+            statut: paiement.statut || "À payer",
+            payeur: profile.nom || "Inconnu",
+            methode: paiement.methode || "—",
+          },
+        ],
+      };
+    });
+  
+    localStorage.setItem("karate_profiles", JSON.stringify(updated));
+  };
+  
+
   // === Rendu ===
   return (
     <div className="p-6 text-gray-800">
@@ -335,13 +369,30 @@ export default function FinanceView() {
                     <td className="p-2 text-center">{p.date}</td>
                     <td className="p-2 text-center">{p.methode}</td>
                     <td className="p-2 text-center">{p.payeur}</td>
-                    <td
-                      className={`p-2 text-center font-semibold ${
-                        p.statut === "Payé" ? "text-green-700" : "text-red-600"
-                      }`}
-                    >
-                      {p.statut}
-                    </td>
+                    <td className="p-2 text-center">
+  {p.statut === "Payé" ? (
+    <span className="text-green-700 font-semibold">Payé</span>
+  ) : (
+    <button
+      onClick={() => {
+        const profiles = JSON.parse(localStorage.getItem("karate_profiles") || "[]");
+        const updated = profiles.map((pr) => {
+          if (pr.nom !== p.profileName) return pr;
+          const pays = (pr.paiements || []).map((x) =>
+            x.type === p.type && x.date === p.date ? { ...x, statut: "Payé" } : x
+          );
+          return { ...pr, paiements: pays };
+        });
+        localStorage.setItem("karate_profiles", JSON.stringify(updated));
+        window.location.reload(); // pour rafraîchir la vue
+      }}
+      className="bg-green-600 text-white px-3 py-1 text-xs rounded hover:bg-green-700"
+    >
+      Marquer payé
+    </button>
+  )}
+</td>
+
                   </tr>
                 ))
               )}

@@ -10,6 +10,8 @@ import {
   Heart,
   UserCheck,
   DollarSign,
+  Menu,
+  X,
 } from "lucide-react";
 
 import DashboardView from "./components/DashboardView";
@@ -20,7 +22,7 @@ import CalendarEnhancedView from "./components/CalendarEnhancedView";
 import AddEventModal from "./components/AddEventModal";
 import ProfileManager from "./components/ProfileManager";
 import PlanningEditor from "./components/PlanningEditor";
-import FinancesView from "./components/FinanceView"; // ✅ ton composant déjà existant
+import FinancesView from "./components/FinanceView";
 
 // ==========================================================
 // Données globales communes
@@ -66,6 +68,7 @@ const DEFAULT_PLANNING = [
 // ==========================================================
 export default function KarateDashboard() {
   const [activeTab, setActiveTab] = useState("Calendrier");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const [profiles, setProfiles] = useState(() => {
     try {
@@ -106,8 +109,7 @@ export default function KarateDashboard() {
       const current = profiles.find((p) => p.actif) || profiles[0];
       setActiveProfile(current || null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // eslint-disable-line
 
   useEffect(() => {
     localStorage.setItem("karate_profiles", JSON.stringify(profiles));
@@ -218,7 +220,6 @@ export default function KarateDashboard() {
     setActiveProfile(newActive || null);
   };
 
-  // 🧾 Ajout de l’onglet Finances ici
   const menu = [
     { label: "Tableau de bord", icon: <Target /> },
     { label: "Calendrier", icon: <CalendarIcon /> },
@@ -233,10 +234,27 @@ export default function KarateDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
+      {/* Bouton menu mobile */}
+      <div className="md:hidden bg-white border-b flex items-center justify-between p-3">
+        <h1 className="text-lg font-bold text-red-600">🥋 Progression</h1>
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="p-2 rounded hover:bg-gray-100"
+        >
+          {menuOpen ? <X /> : <Menu />}
+        </button>
+      </div>
+
       {/* Barre latérale */}
-      <aside className="w-72 bg-white border-r p-4">
-        <h1 className="text-xl font-bold text-red-600 mb-6">
+      <aside
+        className={`${
+          menuOpen
+            ? "translate-x-0"
+            : "-translate-x-full md:translate-x-0"
+        } transform transition-transform duration-300 fixed md:static inset-y-0 left-0 z-40 w-72 bg-white border-r p-4 overflow-y-auto`}
+      >
+        <h1 className="hidden md:block text-xl font-bold text-red-600 mb-6">
           🥋 Progression Karaté
         </h1>
 
@@ -249,8 +267,7 @@ export default function KarateDashboard() {
               </span>
             </div>
             <div className="text-red-800 text-xs mt-1">
-              {activeProfile.type} · Abonnement{" "}
-              {activeProfile.abonnementMensuel ?? 0}$
+              {activeProfile.type} · Abonnement {activeProfile.abonnementMensuel ?? 0}$
             </div>
           </div>
         ) : (
@@ -263,7 +280,10 @@ export default function KarateDashboard() {
           {menu.map((m) => (
             <button
               key={m.label}
-              onClick={() => setActiveTab(m.label)}
+              onClick={() => {
+                setActiveTab(m.label);
+                setMenuOpen(false);
+              }}
               className={`flex items-center gap-2 w-full p-2 rounded-md ${
                 activeTab === m.label
                   ? "bg-red-50 text-red-600"
@@ -277,8 +297,16 @@ export default function KarateDashboard() {
         </nav>
       </aside>
 
+      {/* Overlay mobile */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 bg-black/30 z-30 md:hidden"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+
       {/* Contenu principal */}
-      <main className="flex-1 p-6 overflow-y-auto">
+      <main className="flex-1 p-4 md:p-6 overflow-y-auto mt-2 md:mt-0">
         {activeTab === "Tableau de bord" && (
           <DashboardView
             events={activeEvents}
