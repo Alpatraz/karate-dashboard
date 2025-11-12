@@ -11,11 +11,13 @@ import {
   UserCheck,
   DollarSign,
   Menu,
+  Trophy,
   X,
 } from "lucide-react";
 
 import DashboardView from "./components/DashboardView";
 import ProgressionView from "./components/ProgressionView";
+import CompetitionsView from "./components/CompetitionsView";
 import VideoLibraryView from "./components/VideoLibraryView";
 import InstructorsView from "./components/InstructorsView";
 import CalendarEnhancedView from "./components/CalendarEnhancedView";
@@ -224,6 +226,7 @@ export default function KarateDashboard() {
     { label: "Tableau de bord", icon: <Target /> },
     { label: "Calendrier", icon: <CalendarIcon /> },
     { label: "Base technique", icon: <BookOpen /> },
+    { label: "Compétitions", icon: <Trophy /> },
     { label: "Progression", icon: <LineChart /> },
     { label: "Vidéos", icon: <Play /> },
     { label: "Instructeurs", icon: <Users /> },
@@ -336,6 +339,11 @@ export default function KarateDashboard() {
             setBelts={(newArr) => setBeltsForActiveProfile(newArr)}
           />
         )}
+
+{activeTab === "Compétitions" && (
+  <CompetitionsView activeProfile={activeProfile} />
+)}
+
 
         {activeTab === "Vidéos" && <VideoLibraryView />}
         {activeTab === "Instructeurs" && <InstructorsView />}

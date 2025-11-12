@@ -202,8 +202,7 @@ const addPaymentToFinance = (profile, paiement) => {
   
     localStorage.setItem("karate_profiles", JSON.stringify(updated));
   };
-  
-
+    
   // === Rendu ===
   return (
     <div className="p-6 text-gray-800">
