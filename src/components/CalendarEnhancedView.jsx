@@ -155,7 +155,9 @@ export default function CalendarEnhancedView({
     return bloc.cours.map((c) => ({
       title: c.nom || "Cours de groupe",
       time: c.heure || "",
-      type: c.type || "groupe",
+      ttype: ["privé", "semi", "groupe", "arme", "combat"].includes(c.type)
+      ? c.type
+      : "groupe",
       date: selectedDate,
       status: "planifié",
       profileId: activeProfile?.id || "unknown",
@@ -268,7 +270,9 @@ export default function CalendarEnhancedView({
           date,
           title: c.nom || "Cours de groupe",
           time: c.heure || "",
-          type: c.type || "groupe",
+          type: ["privé", "semi", "groupe", "arme", "combat"].includes(c.type)
+  ? c.type
+  : "groupe",
           status: "planifié",
           profileId: activeProfile?.id || "unknown",
         };

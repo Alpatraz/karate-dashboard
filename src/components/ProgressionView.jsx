@@ -55,8 +55,10 @@ export default function ProgressionView({
   );
 
   const groupPts = done.filter((e) => e.type === "groupe").length;
-  const privatePts = done.filter((e) => e.type === "privé").length * 4;
-  const totalPts = groupPts + privatePts;
+  // inclut "privé" ET "semi" comme 4 points chacun
+const privatePts = done.filter((e) => ["privé", "semi"].includes(e.type)).length * 4;
+const totalPts = groupPts + privatePts;
+
 
   // règle associée à la ceinture actuelle
   let ruleEntry = null;
@@ -169,9 +171,8 @@ export default function ProgressionView({
           </p>
 
           <p className="mt-2 text-sm text-gray-700">
-            Points groupe : <b>{groupPts}</b> · Privés (×4) :{" "}
-            <b>{privatePts}</b>
-          </p>
+  Points groupe : <b>{groupPts}</b> · Privés / Semi (×4) : <b>{privatePts}</b>
+</p>
 
           <p className="text-sm text-gray-700">
             Total : <b>{totalPts}</b>{" "}

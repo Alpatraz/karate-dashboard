@@ -26,7 +26,12 @@ export default function PlanningEditor({ planning, setPlanning }) {
         bloc = { jour, cours: [] };
         updated.push(bloc);
       }
-      bloc.cours.push({ nom: "", heure: "", type: "Adulte" });
+      bloc.cours.push({
+        nom: "",
+        heure: "",
+        typeCours: "groupe", // nature du cours
+        public: "Adulte", // public cible
+      });
       return [...updated];
     });
   };
@@ -72,7 +77,8 @@ export default function PlanningEditor({ planning, setPlanning }) {
             <h3 className="font-bold text-red-600 mb-3">{jour}</h3>
 
             {cours.map((c, idx) => (
-              <div key={idx} className="flex items-center gap-2 mb-2">
+              <div key={idx} className="flex flex-wrap items-center gap-2 mb-2">
+                {/* Nom du cours */}
                 <input
                   className="border rounded p-1 flex-1 text-sm"
                   placeholder="Nom du cours"
@@ -81,25 +87,46 @@ export default function PlanningEditor({ planning, setPlanning }) {
                     updateCourse(jour, idx, "nom", e.target.value)
                   }
                 />
+
+                {/* Heure */}
                 <input
-                  className="border rounded p-1 w-32 text-sm"
+                  className="border rounded p-1 w-28 text-sm"
                   placeholder="Heure"
                   value={c.heure}
                   onChange={(e) =>
                     updateCourse(jour, idx, "heure", e.target.value)
                   }
                 />
+
+                {/* Type de cours */}
                 <select
                   className="border rounded p-1 text-sm"
-                  value={c.type}
+                  value={c.typeCours}
                   onChange={(e) =>
-                    updateCourse(jour, idx, "type", e.target.value)
+                    updateCourse(jour, idx, "typeCours", e.target.value)
+                  }
+                >
+                  <option value="groupe">Groupe</option>
+                  <option value="privé">Privé</option>
+                  <option value="semi">Semi-privé</option>
+                  <option value="arme">Armes</option>
+                  <option value="combat">Combat</option>
+                </select>
+
+                {/* Public */}
+                <select
+                  className="border rounded p-1 text-sm"
+                  value={c.public}
+                  onChange={(e) =>
+                    updateCourse(jour, idx, "public", e.target.value)
                   }
                 >
                   <option value="Adulte">Adulte</option>
                   <option value="Enfant">Enfant</option>
                   <option value="Équipe">Équipe</option>
                 </select>
+
+                {/* Supprimer */}
                 <button
                   onClick={() => removeCourse(jour, idx)}
                   className="text-red-600 hover:text-red-800"

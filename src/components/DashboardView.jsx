@@ -62,7 +62,7 @@ export default function DashboardView({
   );
 
   const groupCount = doneEventsSince.filter((e) => e.type === "groupe").length;
-  const privateCount = doneEventsSince.filter((e) => e.type === "privé").length;
+  const privateCount = doneEventsSince.filter((e) => ["privé", "semi"].includes(e.type)).length;
   const weaponCombatCount = doneEventsSince.filter(
     (e) =>
       e.type === "arme" ||
@@ -159,7 +159,7 @@ export default function DashboardView({
 
   const yearlyStats = {
     groupe: yearlyEvents.filter((e) => e.type === "groupe").length,
-    prive: yearlyEvents.filter((e) => e.type === "privé").length,
+    prive: yearlyEvents.filter((e) => ["privé", "semi"].includes(e.type)).length,
     armes: yearlyEvents.filter((e) =>
       e.title?.toLowerCase().includes("arme")
     ).length,
