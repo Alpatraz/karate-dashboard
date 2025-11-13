@@ -12,6 +12,7 @@ import {
   DollarSign,
   Menu,
   Trophy,
+  Dumbbell,
   X,
 } from "lucide-react";
 
@@ -19,6 +20,7 @@ import DashboardView from "./components/DashboardView";
 import ProgressionView from "./components/ProgressionView";
 import CompetitionsView from "./components/CompetitionsView";
 import VideoLibraryView from "./components/VideoLibraryView";
+import HomeTrainingView from "./components/HomeTrainingView.jsx";
 import InstructorsView from "./components/InstructorsView";
 import CalendarEnhancedView from "./components/CalendarEnhancedView";
 import AddEventModal from "./components/AddEventModal";
@@ -228,6 +230,7 @@ export default function KarateDashboard() {
     { label: "Base technique", icon: <BookOpen /> },
     { label: "Compétitions", icon: <Trophy /> },
     { label: "Progression", icon: <LineChart /> },
+    { label: "Entraînement maison", icon: <Dumbbell /> },
     { label: "Vidéos", icon: <Play /> },
     { label: "Instructeurs", icon: <Users /> },
     { label: "Santé", icon: <Heart /> },
@@ -345,6 +348,9 @@ export default function KarateDashboard() {
 )}
 
 
+{activeTab === "Entraînement maison" && (
+  <HomeTrainingView activeProfile={activeProfile} />
+)}
         {activeTab === "Vidéos" && <VideoLibraryView />}
         {activeTab === "Instructeurs" && <InstructorsView />}
         {activeTab === "Santé" && <div>Santé (à venir)</div>}

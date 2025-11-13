@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Target, Trophy, Calendar } from "lucide-react";
+import { Target, Trophy, Calendar, Dumbbell, ArrowRight } from "lucide-react";
 
 // === utilitaires ===
 function fmtDay(d) {
@@ -34,16 +34,21 @@ function getPendingInvite(belts) {
 }
 
 // === composant principal ===
-export default function DashboardView({ activeProfile, events = [], belts = [] }) {
+export default function DashboardView({
+  activeProfile,
+  events = [],
+  belts = [],
+  setActiveTab,
+}) {
   const [rules, setRules] = useState({});
   const [annee, setAnnee] = useState(new Date().getFullYear());
 
-  // Chargement des règles globales une fois
+  // Chargement des règles globales
   useEffect(() => {
     setRules(JSON.parse(localStorage.getItem("karate_rules") || "{}"));
   }, []);
 
-  // Ceinture actuelle et progression
+  // --- Ceinture actuelle et progression ---
   const currentBelt = getCurrentBelt(belts);
   const currentBeltColor = currentBelt?.couleur || "Blanche";
   const currentBeltDate = currentBelt?.date || null;
@@ -86,7 +91,7 @@ export default function DashboardView({ activeProfile, events = [], belts = [] }
     ? Math.min((totalDone / requiredForNext) * 100, 100)
     : 100;
 
-  // Estimation date prochaine ceinture
+  // --- Estimation date prochaine ceinture ---
   const now = new Date();
   const eightWeeksAgo = new Date();
   eightWeeksAgo.setDate(now.getDate() - 56);
@@ -119,7 +124,32 @@ export default function DashboardView({ activeProfile, events = [], belts = [] }
     : fmtMonthYear(estimatedDateObj);
   const objectifTxt = currentBeltColor + " → " + (nextBeltColor || "—");
 
-  // Stats annuelles
+  // --- Entraînement maison ---
+  const [trainingStats, setTrainingStats] = useState({ total: 0, minutes: 0 });
+
+  useEffect(() => {
+    if (!activeProfile) return;
+    const key = `karate_home_training_${activeProfile.id}`;
+    const data = JSON.parse(localStorage.getItem(key) || "[]");
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+
+    const monthly = data.filter((s) => {
+      const d = new Date(s.date);
+      return d.getMonth() === month && d.getFullYear() === year;
+    });
+
+    const total = monthly.length;
+    const minutes = monthly.reduce(
+      (acc, s) => acc + (s.dureeTotale || s.duree || 0),
+      0
+    );
+
+    setTrainingStats({ total, minutes });
+  }, [activeProfile]);
+
+  // --- Stats annuelles ---
   const yearlyEvents = events.filter(
     (e) =>
       e.profileId === activeProfile?.id &&
@@ -158,6 +188,7 @@ export default function DashboardView({ activeProfile, events = [], belts = [] }
       </div>
     );
 
+  // === RENDER ===
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold text-gray-800 mb-6">
@@ -165,7 +196,7 @@ export default function DashboardView({ activeProfile, events = [], belts = [] }
       </h1>
 
       {/* LIGNE DE CARTES */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         {/* Ceinture actuelle */}
         <div className="bg-white shadow rounded-xl p-5 border border-gray-100">
           <div className="flex items-center gap-3 mb-2">
@@ -257,88 +288,114 @@ export default function DashboardView({ activeProfile, events = [], belts = [] }
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Bloc Cours faits en [année] */}
-<div className="bg-gradient-to-r from-red-50 to-white border border-red-200 rounded-xl shadow-sm p-5 mb-8">
-  <div className="flex items-center justify-between mb-4">
-    <div className="flex items-center gap-3">
-      <Calendar className="text-red-600" size={22} />
-      <h2 className="text-lg font-semibold text-red-700">
-        📅 Cours faits en {annee}
-      </h2>
-    </div>
-    <div className="flex items-center gap-2">
-      <label className="text-sm text-gray-600">Changer d’année :</label>
-      <select
-        className="border border-gray-300 rounded p-1 text-sm bg-white"
-        value={annee}
-        onChange={(e) => setAnnee(e.target.value)}
-      >
-        {[2023, 2024, 2025, 2026, 2027].map((y) => (
-          <option key={y}>{y}</option>
-        ))}
-      </select>
-    </div>
-  </div>
+        {/* Entraînement maison */}
+        <div className="bg-white shadow rounded-xl p-5 border border-gray-100 flex flex-col justify-between transition-all duration-300 hover:shadow-md hover:-translate-y-1">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Dumbbell className="text-red-600" size={24} />
+              <h2 className="text-lg font-semibold text-red-600">
+                Entraînement maison
+              </h2>
+            </div>
+            <p className="text-3xl font-bold text-gray-800">
+              {trainingStats.minutes}{" "}
+              <span className="text-base text-gray-600">min</span>
+            </p>
+            <p className="text-sm text-gray-500">
+              {trainingStats.total} séance
+              {trainingStats.total > 1 ? "s" : ""} ce mois-ci
+            </p>
+          </div>
 
-  {Object.values(yearlyStats).every((v) => v === 0) ? (
-    <p className="text-gray-500 text-sm italic">
-      Aucun cours enregistré pour cette année.
-    </p>
-  ) : (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
-      <div className="bg-white border border-red-100 rounded-lg p-3 shadow-sm">
-        <div className="text-xl">🥋</div>
-        <div className="font-semibold text-gray-800">
-          {yearlyStats.groupe}
-        </div>
-        <div className="text-xs text-gray-500">Cours groupe</div>
-      </div>
-
-      <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
-        <div className="text-xl">🤝</div>
-        <div className="font-semibold text-gray-800">
-          {yearlyStats.prive}
-        </div>
-        <div className="text-xs text-gray-500">
-          Cours privés <span className="text-[10px]">(x4)</span>
+          <button
+            onClick={() => setActiveTab && setActiveTab("Entraînement maison")}
+            className="mt-4 text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+          >
+            Voir les entraînements <ArrowRight size={14} />
+          </button>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
-        <div className="text-xl">💪</div>
-        <div className="font-semibold text-gray-800">
-          {yearlyStats.armes + yearlyStats.combat}
+      {/* === Section cours faits par année === */}
+      <div className="bg-gradient-to-r from-red-50 to-white border border-red-200 rounded-xl shadow-sm p-5 mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Calendar className="text-red-600" size={22} />
+            <h2 className="text-lg font-semibold text-red-700">
+              📅 Cours faits en {annee}
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Changer d’année :</label>
+            <select
+              className="border border-gray-300 rounded p-1 text-sm bg-white"
+              value={annee}
+              onChange={(e) => setAnnee(e.target.value)}
+            >
+              {[2023, 2024, 2025, 2026, 2027].map((y) => (
+                <option key={y}>{y}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        <div className="text-xs text-gray-500">Armes / Combat</div>
+
+        {Object.values(yearlyStats).every((v) => v === 0) ? (
+          <p className="text-gray-500 text-sm italic">
+            Aucun cours enregistré pour cette année.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
+            <div className="bg-white border border-red-100 rounded-lg p-3 shadow-sm">
+              <div className="text-xl">🥋</div>
+              <div className="font-semibold text-gray-800">
+                {yearlyStats.groupe}
+              </div>
+              <div className="text-xs text-gray-500">Cours groupe</div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
+              <div className="text-xl">🤝</div>
+              <div className="font-semibold text-gray-800">
+                {yearlyStats.prive}
+              </div>
+              <div className="text-xs text-gray-500">
+                Cours privés <span className="text-[10px]">(x4)</span>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
+              <div className="text-xl">💪</div>
+              <div className="font-semibold text-gray-800">
+                {yearlyStats.armes + yearlyStats.combat}
+              </div>
+              <div className="text-xs text-gray-500">Armes / Combat</div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
+              <div className="text-xl">🏆</div>
+              <div className="font-semibold text-gray-800">
+                {yearlyStats.competition}
+              </div>
+              <div className="text-xs text-gray-500">Compétitions</div>
+            </div>
+
+            <div className="bg-white border border-red-100 rounded-lg p-3 shadow-sm">
+              <div className="text-2xl font-bold text-red-600">
+                {yearlyStats.groupe +
+                  yearlyStats.prive * 4 +
+                  yearlyStats.armes +
+                  yearlyStats.combat}
+              </div>
+              <div className="text-xs text-gray-600 uppercase tracking-wide">
+                Total points
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="bg-white border border-gray-100 rounded-lg p-3 shadow-sm">
-        <div className="text-xl">🏆</div>
-        <div className="font-semibold text-gray-800">
-          {yearlyStats.competition}
-        </div>
-        <div className="text-xs text-gray-500">Compétitions</div>
-      </div>
-
-      <div className="bg-white border border-red-100 rounded-lg p-3 shadow-sm">
-        <div className="text-2xl font-bold text-red-600">
-          {yearlyStats.groupe +
-            yearlyStats.prive * 4 +
-            yearlyStats.armes +
-            yearlyStats.combat}
-        </div>
-        <div className="text-xs text-gray-600 uppercase tracking-wide">
-          Total points
-        </div>
-      </div>
-    </div>
-  )}
-</div>
-
-
-      {/* Prochains entraînements */}
+      {/* === Prochains entraînements === */}
       <div>
         <h2 className="text-lg font-semibold text-gray-800 mb-3">
           📅 Prochains entraînements
