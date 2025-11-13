@@ -1,0 +1,63 @@
+/* Style minimal pour éviter l'erreur */
+/* Tu peux ajouter le vrai design après */
+
+.video-layout {
+    display: flex;
+    min-height: 100vh;
+  }
+  
+  .video-sidebar {
+    width: 220px;
+    padding: 16px;
+    border-right: 1px solid #e5e7eb;
+    background: #fafafa;
+  }
+  
+  .video-main {
+    flex: 1;
+    padding: 24px;
+  }
+  
+  .channel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  
+  .channel.active {
+    background: #ffe5e5;
+  }
+  
+  .channel-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+  }
+  
+  .video-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+  
+  /* Popup minimal */
+  .popup-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .popup-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 380px;
+    position: relative;
+  }
+  

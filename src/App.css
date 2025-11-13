@@ -40,3 +40,45 @@
 .read-the-docs {
   color: #888;
 }
+
+.video-layout {
+  display: flex;
+  width: 100%;
+}
+
+.video-sidebar {
+  width: 220px;
+  min-height: calc(100vh - 80px);
+  border-right: 1px solid #ddd;
+  padding: 12px;
+  background: #fafafa;
+}
+
+.video-sidebar h3 {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.video-sidebar .channel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.video-sidebar .channel:hover {
+  background: #eee;
+}
+
+.video-sidebar .channel.active {
+  background: #ffd6d6;
+  border-left: 3px solid #e53935;
+}
+
+.video-sidebar .channel img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}

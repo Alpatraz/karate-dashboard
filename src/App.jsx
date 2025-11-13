@@ -38,10 +38,10 @@ const DEFAULT_RULES = {
   "Mauve→Verte": 60,
   "Verte→Verte / Bleue": 40,
   "Verte / Bleue→Bleue": 40,
-  "Bleue→Bleue / Brune": 100,
+  "Bleue→Bleue / Brune": 40,
   "Bleue / Brune→Brune": 40,
-  "Brune→Brune / Noire": 100,
-  "Brune / Noire→Noire": 120,
+  "Brune→Brune / Noire": 40,
+  "Brune / Noire→Noire": 40,
 };
 
 const DEFAULT_PLANNING = [
