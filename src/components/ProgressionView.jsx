@@ -64,9 +64,10 @@ const totalPts = groupPts + privatePts;
   let ruleEntry = null;
   try {
     if (currentBelt && typeof rules === "object") {
-      ruleEntry = Object.entries(rules).find(([transition]) =>
-        transition.startsWith(currentBelt.couleur)
-      );
+      ruleEntry = Object.entries(rules).find(([transition]) => {
+        const [from, to] = transition.split("→").map(s => s.trim());
+        return from === currentBelt.couleur;
+      });           
     }
   } catch (err) {
     console.warn("Erreur lecture règles de progression :", err);

@@ -72,10 +72,11 @@ export default function DashboardView({
   const totalDone = groupCount + privateCount * 4;
 
   const progressionRuleEntry = currentBelt
-    ? Object.entries(rules).find(([transition]) =>
-        transition.startsWith(currentBelt.couleur)
-      )
-    : null;
+  ? Object.entries(rules).find(([transition]) => {
+      const [from, to] = transition.split("→").map(s => s.trim());
+      return from === currentBelt.couleur;
+    })
+  : null;
 
   const invite = getPendingInvite(belts);
   let nextBeltColor = null;

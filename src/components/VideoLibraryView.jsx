@@ -158,9 +158,17 @@ export default function VideoLibraryView() {
   });
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col md:flex-row h-full">
       {/* ======================== SIDEBAR ABONNEMENTS ======================== */}
-      <aside className="w-64 border-r border-gray-200 bg-gray-50 p-4 space-y-4">
+      <aside className="
+  w-full md:w-64
+  md:border-r border-gray-200
+  bg-gray-50
+  p-4 space-y-4
+  overflow-x-auto
+  md:overflow-visible
+  flex-shrink-0
+">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xl">📺</span>
           <h3 className="font-semibold text-gray-800">Abonnements</h3>
