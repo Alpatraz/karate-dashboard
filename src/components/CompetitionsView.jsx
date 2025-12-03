@@ -9,6 +9,44 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// --- PRÉSETS POUR LES CATÉGORIES, ÂGES, NIVEAUX ---
+
+const CATEGORY_PRESETS = {
+  kata: [
+    "Kata traditionnel",
+    "Kata créatif",
+    "Kata armes",
+    "Kata main nue",
+  ],
+  combat: [
+    "Combat point fighting",
+    "Combat light contact",
+    "Combat continu",
+    "Combat équipe",
+  ],
+  arme: [
+    "Kobudo – Bō",
+    "Kobudo – Sai",
+    "Kobudo – Tonfa",
+    "Kobudo – Kama",
+  ],
+};
+
+const AGE_PRESETS = [
+  "8 ans et moins",
+  "9-10 ans",
+  "11-12 ans",
+  "13-14 ans",
+  "15 ans et plus",
+];
+
+const NIVEAU_PRESETS = [
+  "Débutant",
+  "Intermédiaire",
+  "Avancé",
+  "Élite",
+];
+
 export default function CompetitionView({ activeProfile }) {
   const [competitions, setCompetitions] = useState([]);
   const [selectedComp, setSelectedComp] = useState(null);
@@ -406,42 +444,69 @@ export default function CompetitionView({ activeProfile }) {
                 Ajouter une catégorie
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-                <input
-                  className="border p-1 rounded text-sm"
-                  placeholder="Nom"
-                  value={newCat.nom}
-                  onChange={(e) =>
-                    setNewCat({ ...newCat, nom: e.target.value })
-                  }
-                />
-                <select
-                  className="border p-1 rounded text-sm"
-                  value={newCat.type}
-                  onChange={(e) =>
-                    setNewCat({ ...newCat, type: e.target.value })
-                  }
-                >
-                  <option value="kata">Kata</option>
-                  <option value="combat">Combat</option>
-                  <option value="arme">Arme</option>
-                </select>
-                <input
-                  className="border p-1 rounded text-sm"
-                  placeholder="Âge"
-                  value={newCat.age}
-                  onChange={(e) =>
-                    setNewCat({ ...newCat, age: e.target.value })
-                  }
-                />
-                <input
-                  className="border p-1 rounded text-sm"
-                  placeholder="Niveau"
-                  value={newCat.niveau}
-                  onChange={(e) =>
-                    setNewCat({ ...newCat, niveau: e.target.value })
-                  }
-                />
-              </div>
+  {/* Nom de la catégorie, lié au type (kata / combat / arme) */}
+  <div className="col-span-2 md:col-span-1">
+    <input
+      className="border p-1 rounded text-sm w-full"
+      placeholder="Nom de la catégorie"
+      list="category-presets"
+      value={newCat.nom}
+      onChange={(e) =>
+        setNewCat({ ...newCat, nom: e.target.value })
+      }
+    />
+    <datalist id="category-presets">
+      {(CATEGORY_PRESETS[newCat.type] || []).map((label) => (
+        <option key={label} value={label} />
+      ))}
+    </datalist>
+  </div>
+
+  {/* Type : kata / combat / arme */}
+  <select
+    className="border p-1 rounded text-sm"
+    value={newCat.type}
+    onChange={(e) =>
+      setNewCat({ ...newCat, type: e.target.value, nom: "" })
+    }
+  >
+    <option value="kata">Kata</option>
+    <option value="combat">Combat</option>
+    <option value="arme">Arme</option>
+  </select>
+
+  {/* Âge : liste pré-enregistrée */}
+  <select
+    className="border p-1 rounded text-sm"
+    value={newCat.age}
+    onChange={(e) =>
+      setNewCat({ ...newCat, age: e.target.value })
+    }
+  >
+    <option value="">Âge</option>
+    {AGE_PRESETS.map((a) => (
+      <option key={a} value={a}>
+        {a}
+      </option>
+    ))}
+  </select>
+
+  {/* Niveau : liste pré-enregistrée */}
+  <select
+    className="border p-1 rounded text-sm"
+    value={newCat.niveau}
+    onChange={(e) =>
+      setNewCat({ ...newCat, niveau: e.target.value })
+    }
+  >
+    <option value="">Niveau</option>
+    {NIVEAU_PRESETS.map((n) => (
+      <option key={n} value={n}>
+        {n}
+      </option>
+    ))}
+  </select>
+</div>
               <button
                 className="bg-blue-600 text-white text-sm px-3 py-1 rounded"
                 onClick={() => {
