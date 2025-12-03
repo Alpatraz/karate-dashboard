@@ -14,9 +14,9 @@ import {
 const CATEGORY_PRESETS = {
   kata: [
     "Kata traditionnel",
-    "Kata créatif",
-    "Kata armes",
-    "Kata main nue",
+    "Kata tradionnel armé",
+    "Kata open",
+    "Kata open armé",
   ],
   combat: [
     "Combat point fighting",
@@ -33,11 +33,14 @@ const CATEGORY_PRESETS = {
 };
 
 const AGE_PRESETS = [
-  "8 ans et moins",
+  "5 ans et moins",
+  "7 ans et moins",
+  "9 ans et moins",
   "9-10 ans",
   "11-12 ans",
-  "13-14 ans",
-  "15 ans et plus",
+  "18-34 ans",
+  "19 ans et plus",
+  "35 ans et plus",
 ];
 
 const NIVEAU_PRESETS = [
