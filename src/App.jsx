@@ -18,12 +18,14 @@ import {
 
 import DashboardView from "./components/DashboardView";
 import ProgressionView from "./components/ProgressionView";
+import TechniqueBaseView from "./components/TechniqueBaseView.jsx";
 import CompetitionsView from "./components/CompetitionsView";
 import VideoLibraryView from "./components/VideoLibraryView";
 import HomeTrainingView from "./components/HomeTrainingView.jsx";
 import InstructorsView from "./components/InstructorsView";
 import CalendarEnhancedView from "./components/CalendarEnhancedView";
 import AddEventModal from "./components/AddEventModal";
+import HealthView from "./components/HealthView";
 import ProfileManager from "./components/ProfileManager";
 import PlanningEditor from "./components/PlanningEditor";
 import FinancesView from "./components/FinanceView";
@@ -347,6 +349,13 @@ export default function KarateDashboard() {
   <CompetitionsView activeProfile={activeProfile} />
 )}
 
+{activeTab === "Base technique" && (
+  <TechniqueBaseView activeProfile={activeProfile} />
+)}
+
+{activeTab === "Santé" && (
+  <HealthView activeProfile={activeProfile} />
+)}
 
 {activeTab === "Entraînement maison" && (
   <HomeTrainingView activeProfile={activeProfile} />

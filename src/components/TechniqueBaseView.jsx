@@ -1,182 +1,236 @@
-import React, { useEffect, useState } from "react";
-import { db } from "../firebase";
-import {
-  collection,
-  getDocs,
-  doc,
-  setDoc,
-  getDoc,
-} from "firebase/firestore";
-import { Check, RotateCcw, Clock } from "lucide-react";
+// src/components/TechniqueBaseView.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import { BASE_TECHNIQUES } from "../data/baseTechniques";
+import { CheckCircle2, RotateCcw, Clock, Search } from "lucide-react";
+
+const STATUT_OPTIONS = [
+  { value: "", label: "—", icon: "" },
+  { value: "appris", label: "✅ Appris", icon: "✅" },
+  { value: "revoir", label: "🔁 À revoir", icon: "🔁" },
+  { value: "en_cours", label: "🕓 En cours", icon: "🕓" },
+];
 
 export default function TechniqueBaseView({ activeProfile }) {
-  const [techniques, setTechniques] = useState([]);
-  const [progress, setProgress] = useState({});
-  const [filter, setFilter] = useState("Toutes");
+  const [filterCat, setFilterCat] = useState("Tous");
+  const [search, setSearch] = useState("");
+  const [progress, setProgress] = useState({}); // { [techId]: { statut, date, feeling, video, notes } }
 
-  // === Charger les techniques Firestore ===
+  // Clé de stockage par profil
+  const storageKey = activeProfile
+    ? `karate_tech_base_${activeProfile.id}`
+    : "karate_tech_base_default";
+
+  // Chargement
   useEffect(() => {
-    async function fetchData() {
-      const snap = await getDocs(collection(db, "techniques"));
-      setTechniques(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    }
-    fetchData();
-  }, []);
+    const raw = localStorage.getItem(storageKey);
+    setProgress(raw ? JSON.parse(raw) : {});
+  }, [storageKey]);
 
-  // === Charger la progression de l’utilisateur ===
+  // Sauvegarde
   useEffect(() => {
-    if (!activeProfile) return;
-    async function fetchProgress() {
-      const snap = await getDocs(
-        collection(db, `profiles/${activeProfile.id}/techniques_progress`)
-      );
-      const map = {};
-      snap.forEach((d) => (map[d.data().technique_id] = d.data()));
-      setProgress(map);
-    }
-    fetchProgress();
-  }, [activeProfile]);
+    localStorage.setItem(storageKey, JSON.stringify(progress));
+  }, [progress, storageKey]);
 
-  // === Changer le statut d’une technique ===
-  async function updateStatus(techniqueId, statut) {
-    if (!activeProfile) return;
-    const ref = doc(
-      db,
-      `profiles/${activeProfile.id}/techniques_progress/${techniqueId}`
+  if (!activeProfile) {
+    return (
+      <div className="p-6 text-gray-500">
+        Aucun profil actif sélectionné.
+      </div>
     );
-    const record = {
-      technique_id: techniqueId,
-      statut,
-      date_apprentissage: new Date().toISOString().split("T")[0],
-    };
-    await setDoc(ref, record, { merge: true });
-    setProgress((p) => ({ ...p, [techniqueId]: record }));
   }
 
-  const categories = [
-    "Toutes",
-    "Punch",
-    "Kick",
-    "Combat",
-    "Blocking Form",
-    "Kata",
-    "Kata armé",
-    "Auto-défense",
-    "Armes : Bâton / Couteau / Fusil",
-  ];
+  const categories = useMemo(() => {
+    const set = new Set(BASE_TECHNIQUES.map((t) => t.categorie));
+    return ["Tous", ...Array.from(set)];
+  }, []);
 
-  const filtered =
-    filter === "Toutes"
-      ? techniques
-      : techniques.filter((t) => t.categorie === filter);
+  const techniquesFiltrees = BASE_TECHNIQUES.filter((t) => {
+    const matchCat = filterCat === "Tous" || t.categorie === filterCat;
+    const q = search.trim().toLowerCase();
+    const matchSearch =
+      !q ||
+      t.nom.toLowerCase().includes(q) ||
+      t.categorie.toLowerCase().includes(q);
+    return matchCat && matchSearch;
+  });
 
-  if (!activeProfile)
-    return <div className="p-6 text-gray-500">Aucun profil actif.</div>;
+  const updateField = (id, field, value) => {
+    setProgress((prev) => ({
+      ...prev,
+      [id]: {
+        statut: "",
+        date_apprentissage: "",
+        feeling: "",
+        lien_video_perso: "",
+        notes: "",
+        ...(prev[id] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const getStatut = (id) => progress[id]?.statut || "";
+  const getField = (id, field) => progress[id]?.[field] || "";
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">
-        Base technique – {activeProfile.nom}
-      </h1>
+    <div className="p-6 space-y-6">
+      <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            🧱 Base technique – {activeProfile.nom}
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Coche chaque technique quand elle est ✅ apprise, 🔁 à revoir ou 🕓
+            en cours. Ajoute la date, ton feeling et un lien vers ta vidéo
+            perso si tu veux.
+          </p>
+        </div>
 
-      {/* FILTRES */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {categories.map((c) => (
-          <button
-            key={c}
-            onClick={() => setFilter(c)}
-            className={`px-3 py-1 rounded-full border ${
-              filter === c
-                ? "bg-red-600 text-white border-red-600"
-                : "bg-white text-gray-700 border-gray-300 hover:bg-red-50"
-            }`}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <select
+            className="border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+            value={filterCat}
+            onChange={(e) => setFilterCat(e.target.value)}
           >
-            {c}
-          </button>
-        ))}
+            {categories.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+
+          <div className="relative">
+            <span className="absolute left-3 top-2.5 text-gray-400">
+              <Search size={16} />
+            </span>
+            <input
+              type="text"
+              className="border border-gray-300 rounded pl-8 pr-3 py-2 text-sm w-full"
+              placeholder="Rechercher une technique..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
+      </header>
+
+      {/* petit résumé */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        {STATUT_OPTIONS.filter((s) => s.value !== "").map((s) => {
+          const count = Object.values(progress).filter(
+            (p) => p.statut === s.value
+          ).length;
+          return (
+            <div
+              key={s.value}
+              className="bg-white border rounded-lg p-3 shadow-sm flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{s.icon}</span>
+                <span className="text-gray-700">{s.label}</span>
+              </div>
+              <span className="font-bold text-red-600">{count}</span>
+            </div>
+          );
+        })}
       </div>
 
-      {/* TABLEAU TECHNIQUES */}
-      <div className="overflow-x-auto bg-white rounded-xl shadow border border-gray-200">
-        <table className="min-w-full text-sm">
-          <thead className="bg-red-50 border-b border-gray-200 text-gray-700">
-            <tr>
-              <th className="p-3 text-left">Nom</th>
-              <th className="p-3 text-left">Catégorie</th>
-              <th className="p-3 text-left">Ceinture</th>
-              <th className="p-3 text-left">Type</th>
-              <th className="p-3 text-left">Vidéo</th>
-              <th className="p-3 text-left">Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((t) => {
-              const prog = progress[t.id] || {};
-              const statut = prog.statut || "non commencé";
-              const color =
-                statut === "appris"
-                  ? "bg-green-50 text-green-700"
-                  : statut === "revoir"
-                  ? "bg-yellow-50 text-yellow-700"
-                  : statut === "en cours"
-                  ? "bg-blue-50 text-blue-700"
-                  : "";
+      {/* tableau techniques */}
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+        <div className="hidden md:grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold bg-gray-50 border-b text-gray-600">
+          <div className="col-span-3">Technique</div>
+          <div className="col-span-2">Catégorie</div>
+          <div className="col-span-2">Ceintures</div>
+          <div className="col-span-2">Statut</div>
+          <div className="col-span-3">Détails</div>
+        </div>
 
-              return (
-                <tr
-                  key={t.id}
-                  className={`border-b last:border-0 ${color}`}
+        <div className="divide-y">
+          {techniquesFiltrees.map((t) => (
+            <div
+              key={t.id}
+              className="px-3 py-3 text-sm grid grid-cols-1 md:grid-cols-12 gap-2 items-start hover:bg-gray-50"
+            >
+              {/* Nom */}
+              <div className="md:col-span-3">
+                <p className="font-semibold text-gray-900">{t.nom}</p>
+                <p className="text-xs text-gray-500">
+                  Type : {t.type || "—"}
+                </p>
+              </div>
+
+              {/* Catégorie */}
+              <div className="md:col-span-2 text-gray-700">
+                {t.categorie}
+              </div>
+
+              {/* Ceintures */}
+              <div className="md:col-span-2 text-gray-700 text-sm">
+                {t.ceinture_min} → {t.ceinture_max}
+              </div>
+
+              {/* Statut */}
+              <div className="md:col-span-2">
+                <select
+                  className="border border-gray-300 rounded px-2 py-1 text-xs bg-white w-full"
+                  value={getStatut(t.id)}
+                  onChange={(e) =>
+                    updateField(t.id, "statut", e.target.value)
+                  }
                 >
-                  <td className="p-3 font-medium">{t.nom}</td>
-                  <td className="p-3">{t.categorie}</td>
-                  <td className="p-3 text-sm">
-                    {t.ceinture_min} → {t.ceinture_max}
-                  </td>
-                  <td className="p-3">{t.type}</td>
-                  <td className="p-3">
-                    {t.lien_video ? (
-                      <a
-                        href={t.lien_video}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        ▶️ Voir
-                      </a>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => updateStatus(t.id, "appris")}
-                        className="p-1 rounded bg-green-100 hover:bg-green-200"
-                        title="Appris"
-                      >
-                        <Check size={16} />
-                      </button>
-                      <button
-                        onClick={() => updateStatus(t.id, "revoir")}
-                        className="p-1 rounded bg-yellow-100 hover:bg-yellow-200"
-                        title="À revoir"
-                      >
-                        <RotateCcw size={16} />
-                      </button>
-                      <button
-                        onClick={() => updateStatus(t.id, "en cours")}
-                        className="p-1 rounded bg-blue-100 hover:bg-blue-200"
-                        title="En cours"
-                      >
-                        <Clock size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  {STATUT_OPTIONS.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  className="border border-gray-200 rounded px-2 py-1 text-xs mt-1 w-full"
+                  value={getField(t.id, "date_apprentissage")}
+                  onChange={(e) =>
+                    updateField(t.id, "date_apprentissage", e.target.value)
+                  }
+                />
+              </div>
+
+              {/* Détails */}
+              <div className="md:col-span-3 space-y-1">
+                <input
+                  type="text"
+                  placeholder="Feeling (facile, difficile, points à travailler...)"
+                  className="border border-gray-200 rounded px-2 py-1 text-xs w-full"
+                  value={getField(t.id, "feeling")}
+                  onChange={(e) =>
+                    updateField(t.id, "feeling", e.target.value)
+                  }
+                />
+                <input
+                  type="text"
+                  placeholder="Lien vidéo perso (YouTube, Drive...)"
+                  className="border border-gray-200 rounded px-2 py-1 text-xs w-full"
+                  value={getField(t.id, "lien_video_perso")}
+                  onChange={(e) =>
+                    updateField(t.id, "lien_video_perso", e.target.value)
+                  }
+                />
+                <textarea
+                  rows={2}
+                  placeholder="Notes techniques / rappels pour t'en souvenir"
+                  className="border border-gray-200 rounded px-2 py-1 text-xs w-full resize-y"
+                  value={getField(t.id, "notes")}
+                  onChange={(e) =>
+                    updateField(t.id, "notes", e.target.value)
+                  }
+                />
+              </div>
+            </div>
+          ))}
+
+          {techniquesFiltrees.length === 0 && (
+            <div className="px-4 py-6 text-center text-sm text-gray-500">
+              Aucune technique ne correspond à ce filtre.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
