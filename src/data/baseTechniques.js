@@ -102,9 +102,10 @@ export const BASE_TECHNIQUES = [
     { id: "kata_statue_of_the_crane", nom: "Statue of the crane", categorie: "Kata", ceinture_min: "Verte", ceinture_max: "Bleue", type: "kata", lien_video: "", notes: "" },
     { id: "kata_cat_2", nom: "Cat 2", categorie: "Kata", ceinture_min: "Bleue", ceinture_max: "Brune", type: "kata", lien_video: "", notes: "" },
     { id: "kata_cat_3", nom: "Cat 3", categorie: "Kata", ceinture_min: "Brune", ceinture_max: "Noire", type: "kata", lien_video: "", notes: "" },
-    { id: "kata_setsuki", nom: "Setsuki", categorie: "Kata", ceinture_min: "Brune", ceinture_max: "Noire", type: "kata", lien_video: "", notes: "" },
-    { id: "kata_obino", nom: "Obino", categorie: "Kata", ceinture_min: "Noire", ceinture_max: "Noire", type: "kata", lien_video: "", notes: "" },
-    { id: "kata_wansutsuki", nom: "Wansutsuki", categorie: "Kata", ceinture_min: "Noire", ceinture_max: "Noire", type: "kata", lien_video: "", notes: "" },
+    { id: "kata_unsuki", nom: "Unsuki", categorie: "Kata", ceinture_min: "Noire", ceinture_max: "Noire", type: "kata", lien_video: "", notes: "" },
+    { id: "kata_hybino", nom: "Hybino", categorie: "Kata", ceinture_min: "Noire", ceinture_max: "Noire", type: "kata", lien_video: "", notes: "" },
+    { id: "kata_katsuki", nom: "Katsuki", categorie: "Kata", ceinture_min: "Noire", ceinture_max: "Noire", type: "kata", lien_video: "", notes: "" },
+    { id: "kata_sono_nidai", nom: "Sono Nidai", categorie: "Kata", ceinture_min: "Noire", ceinture_max: "Noire", type: "kata", lien_video: "", notes: "" },
   
     // ===================== KATA ARMÉ =====================
     { id: "kata_arme_blocking_form_bo", nom: "Blocking form de bo", categorie: "Kata armé", ceinture_min: "Orange", ceinture_max: "Mauve", type: "kata_arme", lien_video: "", notes: "" },
