@@ -18,6 +18,8 @@ import {
   hoursLabel, trainingChart, recommendations
 } from "./karatelife/core.js";
 import "./KarateLife.css";
+import HomeV2 from "./HomeV2.jsx";
+import "./KarateLifeV2.css";
 
 const ClassicDashboard = React.lazy(() => import("./App.jsx"));
 const MAIN_MENU = [
@@ -492,7 +494,7 @@ export default function KarateLife() {
         <button className="kl-icon-button" aria-label="Changer de profil" onClick={()=>navigate("family")}><ChevronRight size={18}/></button></div>
     </aside>
     {drawer && <button type="button" aria-label="Fermer le menu" className="kl-drawer-cover" onClick={()=>setDrawer(false)}/>}
-    <div className="kl-main-wrap">
+    <div className={cls("kl-main-wrap", tab==="dashboard" && "kl2-on-home")}>
       <header className="kl-topbar"><button className="kl-mobile-menu" aria-label="Menu" onClick={()=>setDrawer(true)}><Menu size={24}/></button>
         <div className="kl-mobile-brand"><Swords size={21}/><strong>KARATÉ <em>LIFE</em></strong></div>
         <div className="kl-top-crumb">KARATÉ LIFE <ChevronRight size={14}/> <span>{currentMenu?.label}</span></div>
@@ -500,7 +502,7 @@ export default function KarateLife() {
           <button className="kl-profile-pill" type="button" onClick={()=>navigate("family")}><span>{activeProfile.nom?.charAt(0)}</span><strong>{activeProfile.nom}</strong><ChevronDown size={14}/></button></div>
       </header>
       <main className="kl-content" id="contenu">
-        {tab==="dashboard"&&<Overview ctx={ctx}/>}
+        {tab==="dashboard"&&<HomeV2 ctx={ctx}/>}
         {tab==="training"&&<Training ctx={ctx}/>}
         {tab==="technique"&&<Techniques ctx={ctx}/>}
         {tab==="competition"&&<Competitions ctx={ctx}/>}
